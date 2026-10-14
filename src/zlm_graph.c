@@ -32,8 +32,11 @@
 #include "zlm_r.h"
 #include "zlm_store.h"
 
-#define ZLM_GRAPH_TENSORS 32768
-#define ZLM_GRAPH_NODES 16384
+/* build contexts: the first holds this many tensors, each next one twice
+   the last, up to ZLM_CTX_MAX; an operation needs room for ZLM_CTX_SLACK */
+#define ZLM_CTX_FIRST 256
+#define ZLM_CTX_MAX 65536
+#define ZLM_CTX_SLACK 32
 
 static SEXP graph_tag(void) {
   static SEXP tag = NULL;
@@ -55,6 +58,9 @@ static void graph_free(zlm_graph *g) {
   if (g->buf_in) ggml_backend_buffer_free(g->buf_in);
   if (g->ctx_in) ggml_free(g->ctx_in);
   if (g->ctx) ggml_free(g->ctx);
+  for (int i = 0; i < g->n_ctx_full; i++) ggml_free(g->ctx_full[i]);
+  free(g->ctx_full);
+  if (g->ctx_graph) ggml_free(g->ctx_graph);
   if (g->ctx_fwd) ggml_free(g->ctx_fwd);
   free(g->out_fwd);
   free(g->in);
@@ -125,8 +131,12 @@ static void record_call(zlm_graph *g, SEXP gptr, SEXP call) {
   }
   SET_VECTOR_ELT(calls, g->n_calls, call);
   int c = g->n_calls++;
-  struct ggml_tensor *t = g->last_seen ? ggml_get_next_tensor(g->ctx, g->last_seen)
-                                       : ggml_get_first_tensor(g->ctx);
+  /* the operation's tensors are in the current context; if it took over
+     since the last call, they start at its beginning */
+  struct ggml_tensor *t = g->last_seen != NULL && g->last_seen_ctx == g->ctx
+                            ? ggml_get_next_tensor(g->ctx, g->last_seen)
+                            : ggml_get_first_tensor(g->ctx);
+  g->last_seen_ctx = g->ctx;
   for (; t != NULL; t = ggml_get_next_tensor(g->ctx, t)) {
     if (g->n_node == g->cap_node) {
       int cap = g->cap_node ? 2 * g->cap_node : 64;
@@ -203,11 +213,7 @@ SEXP zlm_graph_new(SEXP sptr, SEXP names, SEXP dims, SEXP types, SEXP max_bytes,
   }
   struct ggml_init_params pin = { (size_t) (n + 1) * ggml_tensor_overhead(), NULL, true };
   g->ctx_in = ggml_init(pin);
-  struct ggml_init_params pc = {
-    (size_t) ZLM_GRAPH_TENSORS * ggml_tensor_overhead() +
-      ggml_graph_overhead_custom(ZLM_GRAPH_NODES, false),
-    NULL, true
-  };
+  struct ggml_init_params pc = { (size_t) ZLM_CTX_FIRST * ggml_tensor_overhead(), NULL, true };
   g->ctx = ggml_init(pc);
   if (g->ctx_in == NULL || g->ctx == NULL) {
     zlm_raise("zulm_memory_error", R_NilValue, "Out of memory creating a graph.");
@@ -296,8 +302,40 @@ static int can_repeat(const struct ggml_tensor *b, const struct ggml_tensor *a) 
   return 1;
 }
 
+/* Makes sure the build context has room for an operation's tensors (no
+   operation makes more than a few); otherwise a new one, twice as large,
+   takes over. Contexts are sized by use rather than for the largest graph,
+   since their memory is reserved whether used or not. Runs inside
+   zlm_guarded(), so it may not touch R. */
+static void ensure_room(zlm_graph *g) {
+  size_t over = ggml_tensor_overhead();
+  if (ggml_get_mem_size(g->ctx) - ggml_used_mem(g->ctx) >= (size_t) ZLM_CTX_SLACK * over) return;
+  if (g->n_ctx_full == g->cap_ctx_full) {
+    int cap = g->cap_ctx_full ? 2 * g->cap_ctx_full : 8;
+    struct ggml_context **c = (struct ggml_context **) realloc(g->ctx_full, (size_t) cap * sizeof *c);
+    if (c == NULL) GGML_ABORT("out of memory growing a graph");
+    g->ctx_full = c;
+    g->cap_ctx_full = cap;
+  }
+  size_t tensors = 2 * (ggml_get_mem_size(g->ctx) / over);
+  if (tensors > ZLM_CTX_MAX) tensors = ZLM_CTX_MAX;
+  struct ggml_init_params p = { tensors * over, NULL, true };
+  struct ggml_context *next = ggml_init(p);
+  if (next == NULL) GGML_ABORT("out of memory growing a graph");
+  g->ctx_full[g->n_ctx_full++] = g->ctx;
+  g->ctx = next;
+}
+
+/* Tensors made in the build contexts so far, at most. */
+static size_t build_tensors(const zlm_graph *g) {
+  size_t over = ggml_tensor_overhead(), n = ggml_used_mem(g->ctx) / over;
+  for (int i = 0; i < g->n_ctx_full; i++) n += ggml_used_mem(g->ctx_full[i]) / over;
+  return n;
+}
+
 static void op_body(void *data) {
   zlm_opjob *j = (zlm_opjob *) data;
+  ensure_room(j->g);
   struct ggml_context *ctx = j->g->ctx;
   const char *op = j->op;
   struct ggml_tensor *a = j->a, *b = j->b;
@@ -588,7 +626,13 @@ struct finish_job {
 static void finish_body(void *data) {
   struct finish_job *f = (struct finish_job *) data;
   zlm_graph *g = f->g;
-  g->gf = ggml_new_graph_custom(g->ctx, ZLM_GRAPH_NODES, false);
+  /* every node and leaf of gf is a tensor of the build contexts, an input
+     or a parameter; the graph is sized for all of them */
+  size_t size = build_tensors(g) + (size_t) g->n_in + (size_t) g->store->n + 64;
+  struct ggml_init_params pg = { ggml_graph_overhead_custom(size, false), NULL, true };
+  g->ctx_graph = ggml_init(pg);
+  if (g->ctx_graph == NULL) GGML_ABORT("out of memory finishing a graph");
+  g->gf = ggml_new_graph_custom(g->ctx_graph, size, false);
   for (int i = 0; i < f->n; i++) {
     ggml_set_output(f->outs[i]);
     ggml_build_forward_expand(g->gf, f->outs[i]);
@@ -621,10 +665,11 @@ SEXP zlm_graph_finish(SEXP gptr, SEXP outputs) {
   struct finish_job f = { g, n, g->out };
   char msg[2048] = "";
   g->out_fwd = (struct ggml_tensor **) calloc((size_t) (n > 0 ? n : 1), sizeof *g->out_fwd);
+  /* the forward copy holds a tensor per node and leaf of gf, which has at
+     most this many */
+  size_t fsize = build_tensors(g) + (size_t) n + (size_t) g->n_in + (size_t) g->store->n + 64;
   struct ggml_init_params pf = {
-    (size_t) ZLM_GRAPH_TENSORS * ggml_tensor_overhead() +
-      ggml_graph_overhead_custom(ZLM_GRAPH_NODES, false),
-    NULL, true
+    fsize * ggml_tensor_overhead() + ggml_graph_overhead_custom(fsize, false), NULL, true
   };
   g->ctx_fwd = ggml_init(pf);
   if (g->out_fwd == NULL || g->ctx_fwd == NULL) {
@@ -672,8 +717,9 @@ SEXP zlm_graph_finish(SEXP gptr, SEXP outputs) {
     zlm_raise("zulm_internal_error", R_NilValue, "ggml's CPU backend could not start.");
   }
   ggml_backend_cpu_set_n_threads(g->backend, g->threads > 0 ? g->threads : 1);
-  g->bytes_live = g->bytes_compute + g->bytes_inputs + (double) ggml_used_mem(g->ctx) +
-                  (double) ggml_used_mem(g->ctx_fwd);
+  g->bytes_live = g->bytes_compute + g->bytes_inputs + (double) ggml_get_mem_size(g->ctx) +
+                  (double) ggml_get_mem_size(g->ctx_fwd) + (double) ggml_get_mem_size(g->ctx_graph);
+  for (int i = 0; i < g->n_ctx_full; i++) g->bytes_live += (double) ggml_get_mem_size(g->ctx_full[i]);
   zlm_live_add(g->bytes_live);
   g->state = ZLM_GRAPH_READY;
   SEXP handles = PROTECT(Rf_allocVector(VECSXP, n));

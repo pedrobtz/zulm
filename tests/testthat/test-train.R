@@ -300,3 +300,21 @@ test_that("unreferenced graphs and trainers are collected before memory piles up
   invisible(gc())
   expect_lt(zlm_call("zlm_live_bytes"), base + 1)
 })
+
+test_that("graphs grow their contexts as they need, and still name their calls", {
+  # contexts start small and double; 1 500 operations take several
+  p <- zl_params()
+  zl_param(p, "w", 3, init = zl_init_ones())
+  g <- zl_graph(function(x) {
+    h <- x$x
+    for (i in 1:1500) h <- h * 0.999 + 0.001
+    list(out = h, loss = zl_sum(zl_clamp(zl_param_tensor(p, "w") * h, -10, 10)))
+  }, p, list(x = 3), loss = "loss")
+  x <- c(1, 2, 3)
+  want <- x
+  for (i in 1:1500) want <- f32(f32(want * f32(0.999)) + f32(0.001))
+  expect_equal(zl_forward(g, list(x = x))$out, want, tolerance = 1e-5)
+  # the refused operation was made after the contexts grew
+  err <- expect_error(zl_trainer(g, zl_sgd()), class = "zulm_unsupported_backward")
+  expect_match(deparse(err$call), "zl_clamp")
+})

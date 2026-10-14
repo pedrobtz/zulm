@@ -4,11 +4,14 @@
 
 #include "ggml.h"
 #include "ggml-backend.h"
+#include "ggml-impl.h"
 #include "ggml-opt.h"
 #include "zlm_graph.h"
 #include "zlm_r.h"
 
-#define ZLM_GRAPH_NODES_TRAIN 16384
+/* A graph's tensors (nodes, leaves) as finished: what the backward pass's
+   contexts are sized from, rather than for the largest graph */
+#define ZLM_GRAPH_SIZE(g) ((size_t) ggml_graph_n_nodes((g)->gf) + (size_t) (g)->gf->n_leafs + 64)
 #define ZLM_MAX_GRAD_PARAMS 1024
 
 typedef struct zlm_trainer {
@@ -17,6 +20,7 @@ typedef struct zlm_trainer {
   ggml_backend_t backend;
   ggml_backend_sched_t sched;
   ggml_opt_context_t opt;
+  struct ggml_context *ctx_opt; /* ggml-opt's ctx_compute */
   struct ggml_opt_optimizer_params pars; /* read by ggml-opt each step */
   float base_lr;
   double evals;

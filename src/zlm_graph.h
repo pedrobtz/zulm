@@ -20,7 +20,14 @@ typedef struct zlm_graph {
   struct ggml_context *ctx_in;  /* inputs, with a buffer of their own */
   ggml_backend_buffer_t buf_in;
   struct ggml_context *ctx;     /* nodes built by build(); never allocated,
-                                   so ggml-opt can train on them (§4) */
+                                   so ggml-opt can train on them (§4). The
+                                   context being filled: when it runs out of
+                                   room another, twice as large, takes over,
+                                   and the full ones are kept in ctx_full */
+  struct ggml_context **ctx_full;
+  int n_ctx_full, cap_ctx_full;
+  struct ggml_context *last_seen_ctx; /* the context of last_seen */
+  struct ggml_context *ctx_graph; /* gf itself, sized when finished */
   struct ggml_cgraph *gf;
   struct ggml_context *ctx_fwd; /* the copy zl_forward() evaluates */
   struct ggml_cgraph *gf_fwd;

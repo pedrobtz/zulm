@@ -142,9 +142,10 @@ static int index_of(struct ggml_tensor **v, int n, const struct ggml_tensor *t) 
    when set_params is true, and returns their number. */
 int zlm_backward_check(SEXP gptr, struct ggml_tensor *loss, int set_params) {
   zlm_graph *g = zlm_graph_from(gptr);
-  struct ggml_init_params p = { ggml_graph_overhead_custom(ZLM_GRAPH_NODES_TRAIN, false), NULL, true };
+  size_t gsize = ZLM_GRAPH_SIZE(g);
+  struct ggml_init_params p = { ggml_graph_overhead_custom(gsize, false), NULL, true };
   struct ggml_context *ctx = ggml_init(p);
-  struct ggml_cgraph *gf = ggml_new_graph_custom(ctx, ZLM_GRAPH_NODES_TRAIN, false);
+  struct ggml_cgraph *gf = ggml_new_graph_custom(ctx, gsize, false);
   ggml_build_forward_expand(gf, loss);
   int n = ggml_graph_n_nodes(gf);
   struct ggml_tensor **nodes = (struct ggml_tensor **) malloc((size_t) (n > 0 ? n : 1) * sizeof *nodes);
@@ -237,6 +238,7 @@ struct grad_job {
   zlm_graph *g;
   struct ggml_tensor *loss;
   struct ggml_context *ctx;
+  size_t size_f, size_b; /* the forward copy's and the backward graph's sizes */
   struct ggml_cgraph *gb;
   struct ggml_tensor *loss_copy;
   int n;
@@ -245,14 +247,14 @@ struct grad_job {
 
 static void grad_body(void *data) {
   struct grad_job *j = (struct grad_job *) data;
-  struct ggml_cgraph *gf = ggml_new_graph_custom(j->ctx, ZLM_GRAPH_NODES_TRAIN, false);
+  struct ggml_cgraph *gf = ggml_new_graph_custom(j->ctx, j->size_f, false);
   ggml_build_forward_expand(gf, j->loss);
   int n = j->n + 1;
   struct ggml_tensor *in[ZLM_MAX_GRAD_PARAMS + 1];
   struct ggml_tensor *out[ZLM_MAX_GRAD_PARAMS + 1];
   in[0] = j->loss;
   for (int i = 0; i < j->n; i++) in[i + 1] = j->params[i];
-  j->gb = zlm_graph_dup(j->ctx, gf, n, in, out, ZLM_GRAPH_NODES_TRAIN, 1);
+  j->gb = zlm_graph_dup(j->ctx, gf, n, in, out, (int) j->size_b, 1);
   j->loss_copy = out[0];
   ggml_set_loss(j->loss_copy);
   ggml_build_backward_expand(j->ctx, j->gb, NULL);
@@ -293,13 +295,18 @@ SEXP zlm_grad(SEXP gptr, SEXP loss_h, SEXP names, SEXP threads) {
   zlm_backward_check(gptr, loss, 1);
   /* index inputs are checked as zl_forward() checks them */
   zlm_graph_check_indices(g);
+  /* the copy holds the forward graph's tensors, and the backward pass adds
+     at most about three per node */
+  size_t size_f = ZLM_GRAPH_SIZE(g), size_b = 4 * size_f;
   struct ggml_init_params p = {
-    (size_t) 4 * ZLM_GRAPH_NODES_TRAIN * ggml_tensor_overhead() +
-      2 * ggml_graph_overhead_custom(ZLM_GRAPH_NODES_TRAIN, true),
+    size_b * ggml_tensor_overhead() + ggml_graph_overhead_custom(size_f, false) +
+      ggml_graph_overhead_custom(size_b, true),
     NULL, true
   };
   struct grad_job j;
   memset(&j, 0, sizeof j);
+  j.size_f = size_f;
+  j.size_b = size_b;
   j.g = g;
   j.loss = loss;
   j.n = n;
@@ -374,6 +381,7 @@ static void trainer_free(zlm_trainer *t) {
   if (t == NULL) return;
   zlm_live_add(-t->bytes_live);
   if (t->opt) ggml_opt_free(t->opt);
+  if (t->ctx_opt) ggml_free(t->ctx_opt);
   if (t->sched) ggml_backend_sched_free(t->sched);
   if (t->backend) ggml_backend_free(t->backend);
   free(t);
@@ -449,7 +457,17 @@ SEXP zlm_trainer_new(SEXP gptr, SEXP loss_h, SEXP optimizer, SEXP pars, SEXP acc
   struct opt_job j;
   j.t = t;
   j.params = ggml_opt_default_params(t->sched, GGML_OPT_LOSS_TYPE_SUM);
-  j.params.ctx_compute = g->ctx;
+  /* a context of the trainer's own for ggml-opt's gradients and steps:
+     its graphs are GGML_DEFAULT_GRAPH_SIZE nodes, three of them, and the
+     backward pass and the optimiser add a few tensors per node */
+  struct ggml_init_params po = {
+    (size_t) 4 * GGML_DEFAULT_GRAPH_SIZE * ggml_tensor_overhead() +
+      3 * ggml_graph_overhead_custom(GGML_DEFAULT_GRAPH_SIZE, true),
+    NULL, true
+  };
+  t->ctx_opt = ggml_init(po);
+  if (t->ctx_opt == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory creating a trainer.");
+  j.params.ctx_compute = t->ctx_opt;
   j.params.inputs = g->in[0];
   j.params.outputs = loss;
   j.params.build_type = GGML_OPT_BUILD_TYPE_OPT;
@@ -465,7 +483,8 @@ SEXP zlm_trainer_new(SEXP gptr, SEXP loss_h, SEXP optimizer, SEXP pars, SEXP acc
   }
   /* ggml-opt's graphs and the scheduler's tables, measured at about 1 MB,
      beside the scheduler's buffer, which ggml reports */
-  t->bytes_live = 1.0 * 1024 * 1024 + (double) ggml_backend_sched_get_buffer_size(t->sched, t->backend);
+  t->bytes_live = 1.0 * 1024 * 1024 + (double) ggml_get_mem_size(t->ctx_opt) +
+                  (double) ggml_backend_sched_get_buffer_size(t->sched, t->backend);
   zlm_live_add(t->bytes_live);
   UNPROTECT(1);
   return tptr;

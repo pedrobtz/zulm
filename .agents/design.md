@@ -983,7 +983,15 @@ the ISA variant, because a result is reproducible only within one.
   at 1 GB, and valgrind's runner ran out of memory. Each trainer's
   scheduler was also sized for 65 536 nodes, though `ggml-opt`
   duplicates every training graph at `GGML_DEFAULT_GRAPH_SIZE`; it is
-  now sized at twice that, which cut the peak to 160 MB. zulm also
+  now sized at twice that, which cut the peak to 160 MB. Under valgrind
+  with origin tracking every allocated byte costs memory, touched or
+  not, and the tests still passed 15 GB: graphs, the backward pass and
+  trainers reserved contexts for the largest graph (16 384 nodes, about
+  12 MB each). A graph's build context now starts at 256 tensors and
+  doubles when full; the finished graph, its forward copy and the
+  backward pass's contexts are sized from the graph's own node count;
+  and a trainer gives `ggml-opt` a context of its own sized for
+  `GGML_DEFAULT_GRAPH_SIZE`. zulm also
   counts what live graphs and trainers hold, and `zl_graph()` and
   `zl_trainer()` run a full collection first when that count has
   doubled since the last one and passed 128 MB.
