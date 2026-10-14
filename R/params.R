@@ -170,7 +170,7 @@ zl_param_tensor <- function(p, name) {
   info <- zlm_param_info(p, name)
   structure(
     list(store = p, name = name, dim = info$dim, type = info$type),
-    class = "zl_param_ref"
+    class = c("zl_param_ref", "zl_node")
   )
 }
 
