@@ -157,3 +157,17 @@
   [`zl_forward()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md))
   are fixed-order sums of per-row values, so they are the same at any
   thread count.
+
+- Modules:
+  [`zl_linear()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md),
+  [`zl_embedding()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md),
+  [`zl_norm()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md),
+  [`zl_attention()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md),
+  [`zl_mlp()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md),
+  [`zl_block()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md),
+  [`zl_adaln()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  and
+  [`zl_time_embedding()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  declare their parameters in a store and return functions of tensors.
+  They, the losses and two attention blocks in the styles of TimesFM and
+  Toto are checked against PyTorch.

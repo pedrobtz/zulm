@@ -96,6 +96,15 @@ pak::pak("pedrobtz/zulm")
   [`zl_mse()`](https://pedrobtz.github.io/zulm/reference/zl-loss.md)
   [`zl_mae()`](https://pedrobtz.github.io/zulm/reference/zl-loss.md) :
   Losses
+- [`zl_linear()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  [`zl_embedding()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  [`zl_norm()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  [`zl_attention()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  [`zl_mlp()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  [`zl_block()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  [`zl_adaln()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  [`zl_time_embedding()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  : Modules
 - [`zl_where()`](https://pedrobtz.github.io/zulm/reference/zl-select.md)
   [`zl_clamp()`](https://pedrobtz.github.io/zulm/reference/zl-select.md)
   [`zl_tri()`](https://pedrobtz.github.io/zulm/reference/zl-select.md) :
