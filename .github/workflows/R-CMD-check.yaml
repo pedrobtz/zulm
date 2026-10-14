@@ -22,3 +22,12 @@ jobs:
       # Quick on each push to a pull request, full after merge. The
       # `full-ci` label runs the full set on a pull request before merging.
       profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      # The default runners plus x86-64 macOS: CRAN builds Intel macOS
+      # binaries with Apple clang, the CPU-dispatch route of design §13.1
+      # that no other leg exercises.
+      runners: |
+        [{"os": "macos-latest", "r": "release"},
+         {"os": "macos-15-intel", "r": "release"},
+         {"os": "windows-latest", "r": "release"},
+         {"os": "ubuntu-latest", "r": "release"},
+         {"os": "ubuntu-latest", "r": "oldrel-1"}]

@@ -1,0 +1,85 @@
+# Stage 1 measurements (design §12, §13.1): the variant scheme against
+# flag-built references, the unrolling pragma against -funroll-loops,
+# llamafile kernels on and off, install time and size. Informational: the
+# numbers go to the job summary and into the design by hand.
+on:
+  pull_request:
+    paths: ['src/**', 'tools/bench-variants.R', '.github/workflows/measure.yaml']
+  workflow_dispatch:
+
+name: measure
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: clang
+          - os: macos-15-intel
+            compiler: clang
+          - os: macos-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: gcc
+    runs-on: ${{ matrix.os }}
+    name: measure (${{ matrix.os }}, ${{ matrix.compiler }})
+    env:
+      MAKEFLAGS: -j4
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+      - name: clang as the compiler
+        if: matrix.os == 'ubuntu-latest' && matrix.compiler == 'clang'
+        shell: bash
+        run: |
+          mkdir -p ~/.R
+          printf 'CC=clang\nCXX=clang++\nCXX17=clang++\n' >> ~/.R/Makevars
+      - name: CPU
+        shell: bash
+        run: |
+          (lscpu 2>/dev/null || sysctl -a 2>/dev/null | grep machdep.cpu || wmic cpu get name) | head -30
+      - name: variants (the shipped build)
+        shell: bash
+        run: |
+          start=$(date +%s)
+          R CMD INSTALL --preclean . > install.log 2>&1 || { tail -50 install.log; exit 1; }
+          end=$(date +%s)
+          libs=$(Rscript -e 'cat(system.file("libs", package = "zulm"))')
+          echo "install wall time: $((end - start)) s with MAKEFLAGS=$MAKEFLAGS" | tee -a "$GITHUB_STEP_SUMMARY"
+          du -k "$libs"/* | tee -a "$GITHUB_STEP_SUMMARY"
+          Rscript tools/bench-variants.R variants
+      - name: references built with -m flags (x86-64)
+        if: matrix.os != 'macos-latest' && matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          export ZULM_CFLAGS="-msse3 -mssse3 -msse4.1 -msse4.2 -mpopcnt -mavx -mavx2 -mfma -mf16c -mbmi -mbmi2"
+          export ZULM_CXXFLAGS="$ZULM_CFLAGS"
+          R CMD INSTALL --preclean . > install-mavx2.log 2>&1 || { tail -50 install-mavx2.log; exit 1; }
+          Rscript tools/bench-variants.R mavx2
+          if [ "${{ matrix.compiler }}" = gcc ]; then
+            export ZULM_CFLAGS="$ZULM_CFLAGS -funroll-loops"
+            export ZULM_CXXFLAGS="$ZULM_CFLAGS"
+            R CMD INSTALL --preclean . > install-unroll.log 2>&1 || { tail -50 install-unroll.log; exit 1; }
+            Rscript tools/bench-variants.R mavx2-funroll-loops
+          fi
+      - name: llamafile kernels on
+        shell: bash
+        run: |
+          mkdir -p ~/.R
+          echo 'CPPFLAGS += -DGGML_USE_LLAMAFILE' >> ~/.R/Makevars
+          R CMD INSTALL --preclean . > install-llamafile.log 2>&1 || { tail -50 install-llamafile.log; exit 1; }
+          Rscript tools/bench-variants.R llamafile
