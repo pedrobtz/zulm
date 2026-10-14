@@ -66,3 +66,13 @@
 * A NaN reaching `zl_softmax()` no longer stops R, a transposed column
   enters arithmetic and other kernels correctly, and graphs reserve
   memory as they grow rather than for the largest graph.
+
+* Random numbers come from 'zurand': `zl_seed()` sets the session key,
+  `zl_rng_uniform()` and `zl_rng_normal()` draw in R, and
+  `zl_noise_uniform()` and `zl_noise_normal()` draw inside a graph, anew at
+  each training step. Draws do not depend on the thread count or on how a
+  batch is split.
+
+* Reported losses (`zl_cross_entropy()`, `zl_mse()`, `zl_mae()`, from
+  `zl_step()` and `zl_forward()`) are fixed-order sums of per-row values,
+  so they are the same at any thread count.

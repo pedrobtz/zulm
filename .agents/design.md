@@ -1271,6 +1271,31 @@ package and R users of `zurand` get the same f32 values as zulm's
 graphs without knowing the rule. Until then both are zulm's. §11 tests that zulm's values equal `rng_uniform()` and
 `rng_normal()` from R, rounded by the stated rule, on every CI platform.
 
+**As built in Stage 5 (2026-10-14).** The step a graph's draws use is
+the graph's step counter: `zl_step()` sets it to the trainer's count of
+steps (1 for the first) before each evaluation, and `zl_forward()` uses
+the last value (0 before any training). A noise node is a
+`ggml_custom_4d` operation over all pool tasks, each filling a slice of
+elements by position, so a draw is the same at any thread count and
+under any split of a batch with matching offsets. `zl_rng_uniform()`
+and `zl_rng_normal()` in R call the same C code, so the two agree bit
+for bit. At load, zulm reads zurand's table and refuses a version below
+3 with `zulm_companion_error`.
+
+The per-row losses of §7.1 are built by `zl_cross_entropy()`,
+`zl_mse()` and `zl_mae()` when their operands have the same shape: a
+custom node computes each row in `double` on one thread, writes it to
+its output and to a buffer it owns, and joins the loss as
+`0 · sum(step(rows))`, which adds exactly 0 and whose source ggml never
+differentiates (`ggml_step` is in `ggml_build_backward_expand()`'s
+ignored sources), so the node is computed inside `ggml-opt`'s graphs
+without a gradient. `zl_step()` and `zl_forward()` report the buffer's
+pairwise sum in fixed order, scaled as the loss is; a measured
+cross-entropy over 512 rows was identical at one, two, four and eight
+threads while `ggml_cross_entropy_loss`'s own value changed in the last
+digits. A loss composed by the user (say a sum of two losses) reports
+ggml's value.
+
 **Sequencing.** zurand is not on CRAN yet (its first submission is
 prepared); zulm's own submission follows it, as zuflow's follows
 zulm's.
