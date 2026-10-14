@@ -122,9 +122,9 @@ static void arrow_error(const char *column, int64_t row, const char *fmt, const 
   zlm_raise("zulm_arrow_error", extra, fmt, a == NULL ? "" : a, b == NULL ? "" : b);
 }
 
-static void stream_error(zlm_arrow_it *it, int code, const char *what) {
+static void stream_error(struct ArrowArrayStream *st, int code, const char *what) {
   const char *msg = NULL;
-  if (it->stream.get_last_error != NULL) msg = it->stream.get_last_error(&it->stream);
+  if (st->get_last_error != NULL) msg = st->get_last_error(st);
   char buf[512];
   snprintf(buf, sizeof buf, "%s (error %d)", msg != NULL ? msg : "no description", code);
   arrow_error(NULL, -1, "The Arrow stream failed while %s: %s.", what, buf);
@@ -203,18 +203,17 @@ SEXP zlm_arrow_open(SEXP xstream, SEXP names, SEXP is_int, SEXP cols, SEXP rows,
   }
   zlm_arrow_it *it = (zlm_arrow_it *) calloc(1, sizeof *it);
   if (it == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
-  /* move the stream: the producer's struct is marked released, so its own
-     finalizer does nothing, and this iterator releases it once */
-  it->stream = *src;
-  src->release = NULL;
+  /* the iterator owns the schema from here, and the stream only once the
+     map is checked: a refused map leaves the stream with its producer */
+  it->done = 1;
   SEXP ptr = PROTECT(R_MakeExternalPtr(it, it_tag(), R_NilValue));
   R_RegisterCFinalizerEx(ptr, it_finalize, TRUE);
   it->rows = (int64_t) Rf_asReal(rows);
   it->na_mask = Rf_asLogical(na_mask) == TRUE;
   it->pad = Rf_asLogical(pad) == TRUE;
 
-  int rc = it->stream.get_schema(&it->stream, &it->schema);
-  if (rc != 0) stream_error(it, rc, "reading its schema");
+  int rc = src->get_schema(src, &it->schema);
+  if (rc != 0) stream_error(src, rc, "reading its schema");
   const struct ArrowSchema *s = &it->schema;
   if (s->format == NULL || strcmp(s->format, "+s") != 0) {
     arrow_error(NULL, -1, "The Arrow stream must hold record batches (a struct type), not '%s'.%s",
@@ -273,6 +272,11 @@ SEXP zlm_arrow_open(SEXP xstream, SEXP names, SEXP is_int, SEXP cols, SEXP rows,
       in->cols[f] = it->n_cols - 1;
     }
   }
+  /* move the stream: the producer's struct is marked released, so its own
+     finalizer does nothing, and this iterator releases it once */
+  it->stream = *src;
+  src->release = NULL;
+  it->done = 0;
   UNPROTECT(1);
   return ptr;
 }
@@ -350,7 +354,7 @@ static int next_chunk(zlm_arrow_it *it) {
     struct ArrowArray a;
     memset(&a, 0, sizeof a);
     int rc = it->stream.get_next(&it->stream, &a);
-    if (rc != 0) stream_error(it, rc, "reading a record batch");
+    if (rc != 0) stream_error(&it->stream, rc, "reading a record batch");
     if (a.release == NULL) {
       it_release_stream(it);
       return 0;
@@ -587,6 +591,13 @@ SEXP zlm_batch_fill(SEXP gptr, SEXP x) {
     zlm_raise("zulm_invalid_argument", R_NilValue, "This graph is not ready.");
   }
   return Rf_ScalarLogical(zlm_api_batch_fill(g, x) == 0);
+}
+
+/* Frees an iterator now, releasing what it still holds of the stream;
+   for the fuzz target, which cannot wait for the garbage collector. */
+SEXP zlm_arrow_close(SEXP x) {
+  if (TYPEOF(x) == EXTPTRSXP && R_ExternalPtrTag(x) == it_tag()) it_finalize(x);
+  return R_NilValue;
 }
 
 /* list(rows read, ended) for print() and tests. */

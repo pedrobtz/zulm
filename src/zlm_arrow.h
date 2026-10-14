@@ -12,6 +12,7 @@ SEXP zlm_arrow_open(SEXP xstream, SEXP names, SEXP is_int, SEXP cols, SEXP rows,
 SEXP zlm_arrow_next(SEXP x);
 SEXP zlm_batch_fill(SEXP gptr, SEXP x);
 SEXP zlm_arrow_state(SEXP x);
+SEXP zlm_arrow_close(SEXP x);
 SEXP zlm_arrow_test_stream(SEXP batches, SEXP batch_rows, SEXP counts);
 
 #endif
