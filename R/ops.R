@@ -8,7 +8,9 @@
 # types are checked in C (zlm_graph.c) before ggml sees them.
 
 zlm_new_tensor <- function(ptr, gptr, rank) {
-  structure(list(ptr = ptr, graph = gptr, rank = as.integer(rank)), class = c("zl_tensor", "zl_node"))
+  x <- list(ptr = ptr, graph = gptr, rank = as.integer(rank))
+  class(x) <- c("zl_tensor", "zl_node")
+  x
 }
 
 zlm_current_graph <- function() {
@@ -32,7 +34,7 @@ zlm_as_tensor <- function(x, what = "x") {
         "zulm_invalid_argument"
       )
     }
-    ptr <- zlm_call("zlm_graph_param", b$ptr, enc2utf8(x$name))
+    ptr <- zlm_call_quiet("zlm_graph_param", b$ptr, enc2utf8(x$name))
     return(zlm_new_tensor(ptr, b$ptr, length(x$dim)))
   }
   zlm_abort(sprintf("`%s` must be a tensor inside build().", what), "zulm_invalid_argument")
@@ -40,7 +42,7 @@ zlm_as_tensor <- function(x, what = "x") {
 
 # Runs one operation in C and wraps the result with rank `rank`.
 zlm_op <- function(op, a, b = NULL, num = numeric(), ints = integer(), rank = a$rank, call = NULL) {
-  r <- zlm_call(
+  r <- zlm_call_quiet(
     "zlm_op", a$graph, op, a$ptr, if (is.null(b)) NULL else b$ptr,
     as.double(num), as.integer(ints), call
   )

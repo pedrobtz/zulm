@@ -36,7 +36,8 @@
 #'   `zl_param_set()` return the store invisibly. `zl_param_get()` returns
 #'   a double vector or array; `zl_param_names()` the names in the order
 #'   added; `zl_param_count()` the total number of values;
-#'   `zl_param_tensor()` a handle for use when building a graph.
+#'   `zl_param_tensor()` a handle for use when building a graph, for a
+#'   parameter or a state tensor ([zl_state()]).
 #' @export
 #' @examples
 #' p <- zl_params()
@@ -85,7 +86,7 @@ zl_param <- function(p, name, dim, init = zl_init_normal(sd = 0.02), type = c("f
   }
   type <- zlm_match_type(type)
   values <- zlm_init_values(init, name, prod(dim))
-  zlm_call("zlm_store_add", p$ptr, enc2utf8(name), dim, type, values, zlm_max_bytes())
+  zlm_call("zlm_store_add", p$ptr, enc2utf8(name), dim, type, values, zlm_max_bytes(), 0L)
   invisible(p)
 }
 
@@ -130,6 +131,11 @@ zl_param_set <- function(p, name, value) {
   zlm_check_params(p)
   zlm_check_string(name, "name")
   info <- zlm_param_info(p, name)
+  zlm_set_whole(p, name, value, info)
+  invisible(p)
+}
+
+zlm_set_whole <- function(p, name, value, info) {
   if (!is.numeric(value)) {
     zlm_abort("`value` must be numeric.", "zulm_type_error")
   }
@@ -142,8 +148,9 @@ zl_param_set <- function(p, name, value) {
   if (!ok || length(value) != prod(info$dim)) {
     zlm_abort(
       sprintf(
-        "`value` has dimensions %s; parameter '%s' has %s.",
+        "`value` has dimensions %s; %s '%s' has %s.",
         zlm_format_dim(if (is.null(have)) length(value) else have),
+        if (isTRUE(info$state)) "state" else "parameter",
         name,
         zlm_format_dim(info$dim)
       ),
@@ -152,7 +159,6 @@ zl_param_set <- function(p, name, value) {
     )
   }
   zlm_call("zlm_store_set", p$ptr, enc2utf8(name), value)
-  invisible(p)
 }
 
 #' @rdname zl_params
@@ -160,15 +166,16 @@ zl_param_set <- function(p, name, value) {
 zl_param_names <- function(p, types = FALSE) {
   zlm_check_params(p)
   info <- zlm_call("zlm_store_info", p$ptr)
-  if (isTRUE(types)) stats::setNames(info$types, info$names) else info$names
+  keep <- !info$state
+  if (isTRUE(types)) stats::setNames(info$types[keep], info$names[keep]) else info$names[keep]
 }
 
 #' @rdname zl_params
 #' @export
 zl_param_count <- function(p) {
   zlm_check_params(p)
-  dims <- zlm_call("zlm_store_info", p$ptr)$dims
-  sum(vapply(dims, prod, numeric(1)))
+  info <- zlm_call("zlm_store_info", p$ptr)
+  sum(vapply(info$dims[!info$state], prod, numeric(1)))
 }
 
 #' @rdname zl_params
@@ -176,20 +183,26 @@ zl_param_count <- function(p) {
 zl_param_tensor <- function(p, name) {
   zlm_check_params(p)
   zlm_check_string(name, "name")
-  info <- zlm_param_info(p, name)
-  structure(
-    list(store = p, name = name, dim = info$dim, type = info$type),
-    class = c("zl_param_ref", "zl_node")
-  )
+  info <- zlm_param_info(p, name, kind = "any")
+  x <- list(store = p, name = name, dim = info$dim, type = info$type)
+  class(x) <- c("zl_param_ref", "zl_node")
+  x
 }
 
-zlm_param_info <- function(p, name) {
-  info <- zlm_call("zlm_store_info", p$ptr)
-  i <- match(name, info$names)
-  if (is.na(i)) {
-    zlm_abort(sprintf("The store has no parameter '%s'.", name), "zulm_invalid_argument")
+# kind: "param" refuses states, "state" refuses parameters, "any" takes both.
+zlm_param_info <- function(p, name, kind = "param") {
+  info <- zlm_call_quiet("zlm_store_tensor_info", p$ptr, enc2utf8(name))
+  if (is.null(info) || (kind == "state" && !info$state)) {
+    what <- if (kind == "state") "state" else "parameter"
+    zlm_abort(sprintf("The store has no %s '%s'.", what, name), "zulm_invalid_argument")
   }
-  list(dim = info$dims[[i]], type = info$types[[i]])
+  if (kind == "param" && info$state) {
+    zlm_abort(
+      sprintf("'%s' is a state tensor; use zl_state_get() and zl_state_set().", name),
+      "zulm_invalid_argument"
+    )
+  }
+  info
 }
 
 zlm_format_dim <- function(d) {
@@ -213,8 +226,9 @@ print.zl_params <- function(x, ...) {
   if (length(info$names)) {
     shown <- utils::head(seq_along(info$names), 20L)
     lines <- sprintf(
-      "  %s %s %s", format(info$names[shown]), format(info$types[shown]),
-      vapply(info$dims[shown], zlm_format_dim, character(1))
+      "  %s %s %s%s", format(info$names[shown]), format(info$types[shown]),
+      vapply(info$dims[shown], zlm_format_dim, character(1)),
+      ifelse(info$state[shown], " (state)", "")
     )
     cat(lines, sep = "\n")
     if (length(info$names) > 20L) {

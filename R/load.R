@@ -118,13 +118,21 @@ zlm_unload_variant <- function() {
 
 # Calls a routine of the loaded variant.
 zlm_call <- function(name, ...) {
-  if (is.null(.zlm$routines[[name]])) {
+  r <- .zlm$routines[[name]]
+  if (is.null(r)) {
     zlm_abort(
       sprintf("No zulm variant is loaded, or it lacks '%s'.", name),
       "zulm_internal_error"
     )
   }
   on.exit(zlm_flush_log())
+  zlm_dot_call(r, ...)
+}
+
+# For the calls that build a graph, a few microseconds each and hundreds
+# per graph: ggml's builders log nothing but the assertions that zulm turns
+# into errors, so the log is left for the next zlm_call() to flush.
+zlm_call_quiet <- function(name, ...) {
   zlm_dot_call(.zlm$routines[[name]], ...)
 }
 

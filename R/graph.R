@@ -26,7 +26,8 @@
 #' @param outputs The names of the outputs to keep, of those `build()`
 #'   returns; `NULL` for all.
 #' @param ... Dimensions, for `zl_int()`.
-#' @param g A graph.
+#' @param g A graph; for `zl_forward()`, also a graph cache from
+#'   [zl_graph_cache()].
 #' @param data A named list of arrays, one per input, each matching its
 #'   input's dimensions exactly (a plain vector for a one-dimensional
 #'   input). `NA` is refused.
@@ -156,6 +157,9 @@ zlm_check_outputs <- function(res, loss, outputs) {
 #' @rdname zl_graph
 #' @export
 zl_forward <- function(g, data, outputs = NULL) {
+  if (inherits(g, "zl_graph_cache")) {
+    g <- zlm_cache_graph(g, data)
+  }
   zlm_check_graph(g)
   zlm_write_inputs(g, data)
   which <- zlm_output_index(g, outputs)
@@ -241,6 +245,7 @@ zl_graph_info <- function(g) {
     inputs = stats::setNames(g$inputs$dims, g$inputs$names),
     outputs = g$outputs$names,
     loss = g$loss,
+    state_writes = info[[5L]],
     bytes = c(inputs = info[[2L]], compute = info[[3L]])
   )
 }
