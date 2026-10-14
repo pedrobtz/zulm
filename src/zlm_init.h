@@ -14,6 +14,7 @@
 #include "zlm_glue.h"
 #include "zlm_store.h"
 #include "zlm_graph.h"
+#include "zlm_train.h"
 
 SEXP zlm_native_info(void);
 SEXP zlm_log_drain(void);
@@ -55,6 +56,13 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_graph_set_input", (DL_FUNC) &zlm_graph_set_input, 3},
   {"zlm_graph_compute", (DL_FUNC) &zlm_graph_compute, 2},
   {"zlm_graph_info", (DL_FUNC) &zlm_graph_info, 1},
+  {"zlm_graph_output", (DL_FUNC) &zlm_graph_output, 2},
+  {"zlm_grad", (DL_FUNC) &zlm_grad, 4},
+  {"zlm_trainer_new", (DL_FUNC) &zlm_trainer_new, 7},
+  {"zlm_trainer_step", (DL_FUNC) &zlm_trainer_step, 2},
+  {"zlm_trainer_reset", (DL_FUNC) &zlm_trainer_reset, 1},
+  {"zlm_trainer_evals", (DL_FUNC) &zlm_trainer_evals, 1},
+  {"zlm_trainer_free_", (DL_FUNC) &zlm_trainer_free_, 1},
   {NULL, NULL, 0}
 };
 

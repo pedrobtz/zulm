@@ -60,6 +60,8 @@ static void graph_free(zlm_graph *g) {
   free(g->in_rank);
   free(g->out);
   free(g->checks);
+  free(g->node_t);
+  free(g->node_c);
   free(g);
 }
 
@@ -100,6 +102,58 @@ static struct ggml_tensor *tensor_from(SEXP h, SEXP gptr) {
   return (struct ggml_tensor *) t;
 }
 
+SEXP zlm_graph_store_ptr(SEXP gptr) {
+  return VECTOR_ELT(R_ExternalPtrProtected(gptr), 0);
+}
+
+int zlm_graph_is_param(const zlm_graph *g, const struct ggml_tensor *t) {
+  for (int i = 0; i < g->store->n; i++) {
+    if (g->store->tensors[i] == t) return 1;
+  }
+  return 0;
+}
+
+/* Records `call` as the origin of every node created since the last call
+   (an operation may create several: a contiguous copy, a negation). */
+static void record_call(zlm_graph *g, SEXP gptr, SEXP call) {
+  SEXP prot = R_ExternalPtrProtected(gptr);
+  SEXP calls = VECTOR_ELT(prot, 1);
+  if (g->n_calls == Rf_length(calls)) {
+    calls = Rf_lengthgets(calls, 2 * Rf_length(calls));
+    SET_VECTOR_ELT(prot, 1, calls);
+  }
+  SET_VECTOR_ELT(calls, g->n_calls, call);
+  int c = g->n_calls++;
+  struct ggml_tensor *t = g->last_seen ? ggml_get_next_tensor(g->ctx, g->last_seen)
+                                       : ggml_get_first_tensor(g->ctx);
+  for (; t != NULL; t = ggml_get_next_tensor(g->ctx, t)) {
+    if (g->n_node == g->cap_node) {
+      int cap = g->cap_node ? 2 * g->cap_node : 64;
+      struct ggml_tensor **nt = (struct ggml_tensor **) realloc(g->node_t, (size_t) cap * sizeof *nt);
+      if (nt == NULL) return;
+      g->node_t = nt;
+      int *nc = (int *) realloc(g->node_c, (size_t) cap * sizeof *nc);
+      if (nc == NULL) return;
+      g->node_c = nc;
+      g->cap_node = cap;
+    }
+    g->node_t[g->n_node] = t;
+    g->node_c[g->n_node] = c;
+    g->n_node++;
+    g->last_seen = t;
+  }
+}
+
+/* The R call that created node `t`, or NULL. */
+SEXP zlm_graph_call_of(SEXP gptr, struct ggml_tensor *t) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  SEXP calls = VECTOR_ELT(R_ExternalPtrProtected(gptr), 1);
+  for (int k = 0; k < g->n_node; k++) {
+    if (g->node_t[k] == t) return VECTOR_ELT(calls, g->node_c[k]);
+  }
+  return R_NilValue;
+}
+
 /* ---- creation ------------------------------------------------------- */
 
 /* zl_graph(): a graph on store `sptr` with inputs of the given names,
@@ -130,7 +184,12 @@ SEXP zlm_graph_new(SEXP sptr, SEXP names, SEXP dims, SEXP types, SEXP max_bytes,
   if (g == NULL) {
     zlm_raise("zulm_memory_error", R_NilValue, "Out of memory creating a graph.");
   }
-  SEXP gptr = PROTECT(R_MakeExternalPtr(g, graph_tag(), sptr));
+  /* protected: list(store, calls), the store kept alive and the R call
+     of every operation, for errors */
+  SEXP prot = PROTECT(Rf_allocVector(VECSXP, 2));
+  SET_VECTOR_ELT(prot, 0, sptr);
+  SET_VECTOR_ELT(prot, 1, Rf_allocVector(VECSXP, 16));
+  SEXP gptr = PROTECT(R_MakeExternalPtr(g, graph_tag(), prot));
   R_RegisterCFinalizerEx(gptr, graph_finalize, TRUE);
   g->store = s;
   g->threads = Rf_asInteger(threads);
@@ -167,7 +226,7 @@ SEXP zlm_graph_new(SEXP sptr, SEXP names, SEXP dims, SEXP types, SEXP max_bytes,
     ggml_backend_buffer_clear(g->buf_in, 0);
   }
   g->bytes_inputs = n > 0 ? (double) ggml_backend_buffer_get_size(g->buf_in) : 0;
-  UNPROTECT(1);
+  UNPROTECT(2);
   return gptr;
 }
 
@@ -270,9 +329,16 @@ static void op_body(void *data) {
   } else if (strcmp(op, "scale_bias") == 0) {
     r = ggml_scale_bias(ctx, cont(ctx, a), (float) j->p[0], (float) j->p[1]);
   } else if (strcmp(op, "fill_div") == 0) {
-    /* number / tensor */
+    /* number / tensor: c as 0 x + c, so the graph keeps a gradient (ggml's
+       FILL has none); an infinite x gives NaN rather than 0 */
     struct ggml_tensor *x = cont(ctx, a);
-    r = ggml_div(ctx, ggml_fill(ctx, x, (float) j->p[0]), x);
+    r = ggml_div(ctx, ggml_scale_bias(ctx, x, 0.0f, (float) j->p[0]), x);
+  } else if (strcmp(op, "mean") == 0) {
+    /* only through "unchecked:", for the patch P1 regression test */
+    r = ggml_mean(ctx, a);
+  } else if (strcmp(op, "sub_raw") == 0) {
+    /* only through "unchecked:", for the patch P2 regression test */
+    r = ggml_sub(ctx, a, b);
   } else if (strcmp(op, "sum") == 0) {
     r = ggml_sum(ctx, cont(ctx, a));
   } else if (strcmp(op, "sum_rows") == 0) {
@@ -494,6 +560,7 @@ SEXP zlm_op(SEXP gptr, SEXP op, SEXP ha, SEXP hb, SEXP num, SEXP ints, SEXP call
     zlm_raise(status == ZLM_STATUS_MEMORY ? "zulm_memory_error" : "zulm_internal_error", R_NilValue,
               "Building %s failed: %s", j.op, msg[0] ? msg : "unknown operation");
   }
+  record_call(g, gptr, call);
   if (strcmp(j.op, "get_rows") == 0) {
     if (g->n_checks == g->cap_checks) {
       int cap = g->cap_checks ? 2 * g->cap_checks : 8;
@@ -526,7 +593,7 @@ static void finish_body(void *data) {
     ggml_build_forward_expand(g->gf, f->outs[i]);
   }
   /* the copy zl_forward() evaluates */
-  g->gf_fwd = zlm_graph_dup(g->ctx_fwd, g->gf, f->n, f->outs, g->out_fwd);
+  g->gf_fwd = zlm_graph_dup(g->ctx_fwd, g->gf, f->n, f->outs, g->out_fwd, 0, 0);
 }
 
 /* Ends build(): flags and records the outputs, then allocates the
@@ -667,10 +734,8 @@ SEXP zlm_graph_set_input(SEXP gptr, SEXP index, SEXP values) {
   return R_NilValue;
 }
 
-/* Runs the graph once; returns the requested outputs as doubles. */
-SEXP zlm_graph_compute(SEXP gptr, SEXP which) {
-  zlm_graph *g = zlm_graph_from(gptr);
-  need_ready(g);
+/* Every index input must lie within its table before a kernel reads it. */
+void zlm_graph_check_indices(zlm_graph *g) {
   for (int c = 0; c < g->n_checks; c++) {
     const zlm_index_check *k = &g->checks[c];
     const int32_t *v = (const int32_t *) k->idx->data;
@@ -683,6 +748,19 @@ SEXP zlm_graph_compute(SEXP gptr, SEXP which) {
       }
     }
   }
+}
+
+/* The original node of output i, for training on it. */
+SEXP zlm_graph_output(SEXP gptr, SEXP index) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  return R_MakeExternalPtr(g->out[Rf_asInteger(index)], R_NilValue, gptr);
+}
+
+/* Runs the graph once; returns the requested outputs as doubles. */
+SEXP zlm_graph_compute(SEXP gptr, SEXP which) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  need_ready(g);
+  zlm_graph_check_indices(g);
   enum ggml_status st = ggml_backend_graph_compute(g->backend, g->gf_fwd);
   if (st != GGML_STATUS_SUCCESS) {
     zlm_raise("zulm_internal_error", R_NilValue, "ggml failed to compute the graph (status %d).", (int) st);

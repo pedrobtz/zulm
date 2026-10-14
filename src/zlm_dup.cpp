@@ -47,11 +47,13 @@ ggml_tensor *map_tensor(std::unordered_map<ggml_tensor *, ggml_tensor *> &m, ggm
 
 }  // namespace
 
-// Copies `src` into `ctx`; map_out[i] receives the copy of map_in[i].
+// Copies `src` into `ctx`, as a graph of `size` nodes (0: src's size)
+// with or without gradients; map_out[i] receives the copy of map_in[i].
 extern "C" ggml_cgraph *zlm_graph_dup(ggml_context *ctx, ggml_cgraph *src, int n,
-                                      ggml_tensor **map_in, ggml_tensor **map_out) {
+                                      ggml_tensor **map_in, ggml_tensor **map_out,
+                                      int size, int grads) {
   std::unordered_map<ggml_tensor *, ggml_tensor *> m;
-  ggml_cgraph *dst = ggml_new_graph_custom(ctx, src->size, false);
+  ggml_cgraph *dst = ggml_new_graph_custom(ctx, size > 0 ? size : src->size, grads != 0);
   for (int i = 0; i < src->n_leafs; i++) {
     ggml_build_forward_expand(dst, map_tensor(m, ctx, src->leafs[i]));
   }

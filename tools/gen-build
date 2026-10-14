@@ -29,7 +29,7 @@ ggml-cpu/tiled/tiled-kernel.cpp ggml-cpu/binary-ops.cpp ggml-cpu/unary-ops.cpp
 ggml-cpu/vec.cpp ggml-cpu/ops.cpp ggml-cpu/llamafile/sgemm.cpp"
 X86_SRC="ggml-cpu/arch/x86/quants.c ggml-cpu/arch/x86/repack.cpp"
 ARM_SRC="ggml-cpu/arch/arm/quants.c ggml-cpu/arch/arm/repack.cpp"
-GLUE_OBJ="zlm_dup.o zlm_glue.o zlm_graph.o zlm_log.o zlm_r.o zlm_shim.o zlm_store.o"
+GLUE_OBJ="zlm_dup.o zlm_glue.o zlm_graph.o zlm_log.o zlm_r.o zlm_shim.o zlm_store.o zlm_train.o"
 
 rm -rf zlm_v make
 mkdir -p zlm_v make

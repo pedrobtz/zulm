@@ -34,6 +34,13 @@ typedef struct zlm_graph {
   int n_out;
   zlm_index_check *checks;
   int n_checks, cap_checks;
+  /* the R call that made each node, for errors (design §6.2): node
+     node_t[k] came from call node_c[k] of the list in the graph's
+     protected value */
+  struct ggml_tensor **node_t;
+  int *node_c;
+  int n_node, cap_node, n_calls;
+  struct ggml_tensor *last_seen;
   int state;
   int threads;
   double max_bytes, bytes_inputs, bytes_compute;
@@ -45,7 +52,8 @@ zlm_graph *zlm_graph_from(SEXP x);
 extern "C" {
 #endif
 struct ggml_cgraph *zlm_graph_dup(struct ggml_context *ctx, struct ggml_cgraph *src, int n,
-                                  struct ggml_tensor **map_in, struct ggml_tensor **map_out);
+                                  struct ggml_tensor **map_in, struct ggml_tensor **map_out,
+                                  int size, int grads);
 #ifdef __cplusplus
 }
 #endif
@@ -61,5 +69,10 @@ SEXP zlm_graph_abandon(SEXP gptr);
 SEXP zlm_graph_set_input(SEXP gptr, SEXP index, SEXP values);
 SEXP zlm_graph_compute(SEXP gptr, SEXP which);
 SEXP zlm_graph_info(SEXP gptr);
+SEXP zlm_graph_call_of(SEXP gptr, struct ggml_tensor *t);
+void zlm_graph_check_indices(zlm_graph *g);
+SEXP zlm_graph_output(SEXP gptr, SEXP index);
+SEXP zlm_graph_store_ptr(SEXP gptr);
+int zlm_graph_is_param(const zlm_graph *g, const struct ggml_tensor *t);
 
 #endif
