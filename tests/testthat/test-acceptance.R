@@ -61,8 +61,8 @@ velocity <- function(m, z, kind, x_t, t) {
   m$fo(zl_silu(m$ada(zl_rms_norm(m$fin(x_t)), cond)))
 }
 
-train_flow <- function(threads, steps = 1000L) {
-  withr::local_options(zulm.threads = threads)
+train_flow <- function(threads, steps = 1000L, clip_norm = NULL) {
+  local_threads(threads)
   old <- zl_seed(2026)
   on.exit(zl_seed(old), add = TRUE)
   fm <- flow_model()
@@ -79,7 +79,7 @@ train_flow <- function(threads, steps = 1000L) {
     inputs = list(feat = c(8, 64, 16), kind = zl_int(64, 16), kind_prob = c(4, 64, 16), t = c(1, 64, 16), y = c(7, 64, 16)),
     loss = "loss"
   )
-  tr <- zl_trainer(g, zl_adamw(lr = 1e-3))
+  tr <- zl_trainer(g, zl_adamw(lr = 1e-3), clip_norm = clip_norm)
   losses <- vapply(seq_len(steps), function(i) zl_step(tr, synth_batch(i)), numeric(1))
   list(p = fm$p, m = m, g = g, losses = losses,
        params = lapply(stats::setNames(nm = zl_param_names(fm$p)), function(nm) zl_param_get(fm$p, nm)))
@@ -113,4 +113,16 @@ test_that("the §1.1 model trains, reproducibly at one and two threads", {
   }
   expect_true(all(is.finite(x)))
   expect_lt(abs(mean(x) - mean(b$y)), 1)
+})
+
+test_that("200 steps of the §1.1 model are bit-identical at one, two and four threads", {
+  skip_if_not(identical(Sys.getenv("ZULM_ACCEPTANCE"), "true"), "acceptance runs on CI")
+  for (clip in list(NULL, 1)) {
+    one <- train_flow(1L, steps = 200L, clip_norm = clip)
+    for (threads in c(2L, 4L)) {
+      other <- train_flow(threads, steps = 200L, clip_norm = clip)
+      expect_identical(other$losses, one$losses)
+      expect_identical(other$params, one$params)
+    }
+  }
 })

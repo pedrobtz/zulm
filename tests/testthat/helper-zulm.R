@@ -117,3 +117,10 @@ f32_toward_zero <- function(x) {
   }
   r
 }
+
+# Sets the session's threads for the calling test, and restores them.
+local_threads <- function(n, envir = parent.frame()) {
+  old <- zl_threads(n)
+  withr::defer(zl_threads(old), envir = envir)
+  invisible(old)
+}
