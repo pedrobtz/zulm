@@ -19,7 +19,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 
 | Stage | Title | Issue | Pull request | Done |
 | --- | --- | --- | --- | --- |
-| 0 | [Package identity](#stage-0--package-identity) | [#2](https://github.com/pedrobtz/zulm/issues/2) | | 2026-10-14 |
+| 0 | [Package identity](#stage-0--package-identity) | [#2](https://github.com/pedrobtz/zulm/issues/2) | [#19](https://github.com/pedrobtz/zulm/pull/19) | 2026-10-14 |
 | 1 | [Vendored ggml and the CPU-dispatch go/no-go](#stage-1--vendored-ggml-and-the-cpu-dispatch-gono-go) | [#3](https://github.com/pedrobtz/zulm/issues/3) | | |
 | 2 | [Tensors, types, store and GGUF](#stage-2--tensors-types-store-and-gguf) | [#4](https://github.com/pedrobtz/zulm/issues/4) | | |
 | 3 | [Graphs, operations, forward and validation](#stage-3--graphs-operations-forward-and-validation) | [#5](https://github.com/pedrobtz/zulm/issues/5) | | |
