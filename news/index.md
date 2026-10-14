@@ -133,3 +133,27 @@
   no longer stops R, a transposed column enters arithmetic and other
   kernels correctly, and graphs reserve memory as they grow rather than
   for the largest graph.
+
+- Random numbers come from ‘zurand’:
+  [`zl_seed()`](https://pedrobtz.github.io/zulm/reference/zl_seed.md)
+  sets the session key,
+  [`zl_rng_uniform()`](https://pedrobtz.github.io/zulm/reference/zl_rng_uniform.md)
+  and
+  [`zl_rng_normal()`](https://pedrobtz.github.io/zulm/reference/zl_rng_uniform.md)
+  draw in R, and
+  [`zl_noise_uniform()`](https://pedrobtz.github.io/zulm/reference/zl_noise_normal.md)
+  and
+  [`zl_noise_normal()`](https://pedrobtz.github.io/zulm/reference/zl_noise_normal.md)
+  draw inside a graph, anew at each training step. Draws do not depend
+  on the thread count or on how a batch is split.
+
+- Reported losses
+  ([`zl_cross_entropy()`](https://pedrobtz.github.io/zulm/reference/zl-loss.md),
+  [`zl_mse()`](https://pedrobtz.github.io/zulm/reference/zl-loss.md),
+  [`zl_mae()`](https://pedrobtz.github.io/zulm/reference/zl-loss.md),
+  from
+  [`zl_step()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  and
+  [`zl_forward()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md))
+  are fixed-order sums of per-row values, so they are the same at any
+  thread count.

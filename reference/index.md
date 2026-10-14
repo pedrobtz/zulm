@@ -61,6 +61,9 @@
   [`zl_init_zeros()`](https://pedrobtz.github.io/zulm/reference/zl_init_normal.md)
   [`zl_init_ones()`](https://pedrobtz.github.io/zulm/reference/zl_init_normal.md)
   : Initialisers for parameters
+- [`zl_noise_normal()`](https://pedrobtz.github.io/zulm/reference/zl_noise_normal.md)
+  [`zl_noise_uniform()`](https://pedrobtz.github.io/zulm/reference/zl_noise_normal.md)
+  : Random draws inside a graph
 - [`zl_params()`](https://pedrobtz.github.io/zulm/reference/zl_params.md)
   [`zl_param()`](https://pedrobtz.github.io/zulm/reference/zl_params.md)
   [`zl_param_get()`](https://pedrobtz.github.io/zulm/reference/zl_params.md)
@@ -69,9 +72,14 @@
   [`zl_param_count()`](https://pedrobtz.github.io/zulm/reference/zl_params.md)
   [`zl_param_tensor()`](https://pedrobtz.github.io/zulm/reference/zl_params.md)
   : Parameter stores
+- [`zl_rng_uniform()`](https://pedrobtz.github.io/zulm/reference/zl_rng_uniform.md)
+  [`zl_rng_normal()`](https://pedrobtz.github.io/zulm/reference/zl_rng_uniform.md)
+  : Random draws, in R
 - [`zl_save()`](https://pedrobtz.github.io/zulm/reference/zl_save.md)
   [`zl_load()`](https://pedrobtz.github.io/zulm/reference/zl_save.md) :
   Save and load parameters as GGUF
+- [`zl_seed()`](https://pedrobtz.github.io/zulm/reference/zl_seed.md) :
+  The session's random-number key
 - [`zl_trainer()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
   [`zl_step()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
   [`zl_grad()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)

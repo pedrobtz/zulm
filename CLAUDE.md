@@ -26,14 +26,12 @@ decides.
 
 ## Current state
 
-Verified 2026-10-14: Stage 4 of the roadmap. ggml v0.26.0’s CPU subset
-is vendored and builds as CPU-dispatched variants (Stage 1). Parameter
-stores, initialisers, GGUF persistence and the condition hierarchy exist
-(Stage 2). Graphs, every operation of design §5.3 and the forward pass
-exist (Stage 3). Training through `ggml-opt` with AdamW and SGD,
-accumulation and clipping exists (Stage 4); random numbers in graphs
-start in Stage 5. Patches P1, P2, P7, P8, P9 and P10 are vendored from
-`tools/patches/`; none has an upstream pull request yet (design §9.3).
+Verified 2026-10-14: Stage 5 of the roadmap. ggml v0.26.0’s CPU subset
+is vendored and builds as CPU-dispatched variants (Stage 1). Stores and
+GGUF (Stage 2), graphs and operations (Stage 3), training through
+`ggml-opt` (Stage 4), and zurand draws with fixed-order loss sums (Stage
+5) exist; modules come in Stage 6. Patches P1, P2, P7, P8, P9 and P10
+are vendored; none has an upstream pull request yet (design §9.3).
 
 ## Stage tracking
 
