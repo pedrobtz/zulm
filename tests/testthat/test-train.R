@@ -258,7 +258,7 @@ test_that("training is bit-identical at one, two and four threads", {
   w1 <- rand_array(c(16, 24), -0.3, 0.3)
   w2 <- rand_array(c(24, 1), -0.3, 0.3)
   run <- function(threads) {
-    withr::local_options(zulm.threads = threads)
+    local_threads(threads)
     p <- zl_params()
     zl_param(p, "w1", c(16, 24), init = zl_init_zeros())
     zl_param(p, "w2", c(24, 1), init = zl_init_zeros())

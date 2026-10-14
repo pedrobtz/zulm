@@ -1067,6 +1067,21 @@ the ISA variant, because a result is reproducible only within one.
   `zulm_interrupt` after the compute returns. A trainer interrupted
   mid-step has undefined optimiser state for that step and says so.
 
+**As built in Stage 7 (2026-10-14).** The pool is created on the first
+computation that uses more than one thread and attached to each CPU
+backend before it computes, with the session's thread count. Because
+`ggml_backend_cpu_set_threadpool()` pauses a backend's previous pool,
+zulm keeps a registry of its live CPU backends and detaches the pool from
+every one before freeing it (a resize, a change of polling): freeing it
+first was a use-after-free that crashed on the next computation. Measured
+on the §1.1 step (arm64, eight cores): 48 ms at one thread, 32 ms at two,
+29 ms at four, and the same with polling 0 and ggml's 50, so polling
+stays at 0. A forked child that trains with two threads gives the same
+parameters and losses as its parent (a test). An interrupt arrives at
+the next node: a test sends `SIGINT` a fifth of the way into a
+thousand-node graph, gets `zulm_interrupt`, and computes correctly
+afterwards.
+
 ### 6.8 Logging
 
 ggml's log goes through `ggml_log_set()` into a buffer; zulm emits

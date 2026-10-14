@@ -262,12 +262,6 @@ print.zl_graph <- function(x, ...) {
   invisible(x)
 }
 
-# Threads for a graph's computation; zl_threads() arrives in Stage 7.
-zlm_threads <- function() {
-  n <- getOption("zulm.threads", 1L)
-  if (!is.numeric(n) || length(n) != 1L || is.na(n) || n < 1) 1L else as.integer(n)
-}
-
 # The reported value of a loss with per-row companions: their fixed-order
 # sums, added in order.
 zlm_rowloss_sum <- function(rl) {

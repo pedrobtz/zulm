@@ -25,6 +25,7 @@ Imports:
     zurand
 Suggests: 
     nanoarrow,
+    parallel,
     testthat (>= 3.0.0),
     withr
 LinkingTo: 

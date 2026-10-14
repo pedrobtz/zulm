@@ -36,7 +36,7 @@ test_that("in-graph draws equal the R draws, at every thread count and split", {
   old <- zl_seed(31)
   on.exit(zl_seed(old), add = TRUE)
   draws <- function(threads, dims = c(7, 9), offset = 0) {
-    withr::local_options(zulm.threads = threads)
+    local_threads(threads)
     g <- zl_graph(function(x) list(n = zl_noise_normal(dims, "eps", offset), u = zl_noise_uniform(dims, "tau", offset)),
                   zl_params(), list(a = 1))
     zl_forward(g, list(a = 1))
@@ -79,7 +79,7 @@ test_that("reported losses are bit-identical at one, two and four threads", {
   pr <- matrix(runif(32 * 256), 32)
   pr <- array(f32(sweep(pr, 2, colSums(pr), "/")), dim(pr))
   report <- function(threads) {
-    withr::local_options(zulm.threads = threads)
+    local_threads(threads)
     g <- zl_graph(
       function(x) list(ce = zl_cross_entropy(x$l, x$p), mse = zl_mse(x$l, x$p), mae = zl_mae(x$l, x$p)),
       zl_params(), list(l = c(32, 256), p = c(32, 256))
@@ -102,7 +102,7 @@ test_that("zl_step() reports the per-row loss, the same at any thread count", {
   y <- array(f32(diag(4)[, sample(4, 64, replace = TRUE)]), c(4, 64))
   w0 <- matrix(f32(rnorm(32, sd = 0.3)), 8)
   run <- function(threads) {
-    withr::local_options(zulm.threads = threads)
+    local_threads(threads)
     p <- zl_params()
     zl_param(p, "w", c(8, 4), init = zl_init_zeros())
     zl_param_set(p, "w", w0)

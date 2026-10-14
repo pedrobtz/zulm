@@ -5,6 +5,7 @@ ZLM_COMMON = zlm_dup.o \
   zlm_glue.o \
   zlm_graph.o \
   zlm_log.o \
+  zlm_pool.o \
   zlm_r.o \
   zlm_rng.o \
   zlm_shim.o \

@@ -29,6 +29,7 @@
 #include "ggml-cpu.h"
 #include "zlm_glue.h"
 #include "zlm_graph.h"
+#include "zlm_pool.h"
 #include "zlm_r.h"
 #include "zlm_rng.h"
 #include "zlm_store.h"
@@ -55,7 +56,10 @@ static void graph_free(zlm_graph *g) {
   if (g == NULL) return;
   zlm_live_add(-g->bytes_live);
   if (g->galloc) ggml_gallocr_free(g->galloc);
-  if (g->backend) ggml_backend_free(g->backend);
+  if (g->backend) {
+    zlm_backend_unregister(g->backend);
+    ggml_backend_free(g->backend);
+  }
   if (g->buf_in) ggml_backend_buffer_free(g->buf_in);
   if (g->ctx_in) ggml_free(g->ctx_in);
   if (g->ctx) ggml_free(g->ctx);
@@ -886,6 +890,7 @@ SEXP zlm_graph_finish(SEXP gptr, SEXP outputs) {
     g->state = ZLM_GRAPH_FAILED;
     zlm_raise("zulm_internal_error", R_NilValue, "ggml's CPU backend could not start.");
   }
+  zlm_backend_register(g->backend);
   ggml_backend_cpu_set_n_threads(g->backend, g->threads > 0 ? g->threads : 1);
   g->bytes_live = g->bytes_compute + g->bytes_inputs + (double) ggml_get_mem_size(g->ctx) +
                   (double) ggml_get_mem_size(g->ctx_fwd) + (double) ggml_get_mem_size(g->ctx_graph);
@@ -981,7 +986,11 @@ SEXP zlm_graph_compute(SEXP gptr, SEXP which) {
   zlm_graph *g = zlm_graph_from(gptr);
   need_ready(g);
   zlm_graph_check_indices(g);
+  zlm_prepare_backend(g->backend);
   enum ggml_status st = ggml_backend_graph_compute(g->backend, g->gf_fwd);
+  if (zlm_interrupted()) {
+    zlm_raise("zulm_interrupt", R_NilValue, "The computation was interrupted.");
+  }
   if (st != GGML_STATUS_SUCCESS) {
     zlm_raise("zulm_internal_error", R_NilValue, "ggml failed to compute the graph (status %d).", (int) st);
   }

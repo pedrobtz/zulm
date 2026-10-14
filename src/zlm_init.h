@@ -16,6 +16,7 @@
 #include "zlm_graph.h"
 #include "zlm_train.h"
 #include "zlm_rng.h"
+#include "zlm_pool.h"
 
 SEXP zlm_native_info(void);
 SEXP zlm_log_drain(void);
@@ -72,6 +73,9 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_rowloss_op", (DL_FUNC) &zlm_rowloss_op, 6},
   {"zlm_rowloss_get", (DL_FUNC) &zlm_rowloss_get, 1},
   {"zlm_const", (DL_FUNC) &zlm_const, 3},
+  {"zlm_threads_", (DL_FUNC) &zlm_threads_, 1},
+  {"zlm_poll_", (DL_FUNC) &zlm_poll_, 1},
+  {"zlm_cores", (DL_FUNC) &zlm_cores, 0},
   {NULL, NULL, 0}
 };
 
