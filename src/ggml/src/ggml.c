@@ -6840,7 +6840,11 @@ static void ggml_compute_backward(
                 ggml_add_or_set(ctx, cgraph, isrc0, grad);
             }
             if (src1_needs_grads) {
-                ggml_sub_or_set(ctx, cgraph, isrc1, grad);
+                struct ggml_tensor * tmp = grad;
+                if (!ggml_are_same_shape(src0, src1)) {
+                    tmp = ggml_repeat_back(ctx, tmp, src1);
+                }
+                ggml_sub_or_set(ctx, cgraph, isrc1, tmp);
             }
         } break;
         case GGML_OP_MUL: {
@@ -6860,7 +6864,11 @@ static void ggml_compute_backward(
                 ggml_add_or_set(ctx, cgraph, isrc0, ggml_div(ctx, grad, src1));
             }
             if (src1_needs_grads) {
-                ggml_sub_or_set(ctx, cgraph, isrc1, ggml_mul(ctx, grad, ggml_div(ctx, tensor, src1)));
+                struct ggml_tensor * tmp = ggml_mul(ctx, grad, ggml_div(ctx, tensor, src1));
+                if (!ggml_are_same_shape(src0, src1)) {
+                    tmp = ggml_repeat_back(ctx, tmp, src1);
+                }
+                ggml_sub_or_set(ctx, cgraph, isrc1, tmp);
             }
         } break;
         case GGML_OP_SQR: {
@@ -6900,7 +6908,7 @@ static void ggml_compute_backward(
         } break;
         case GGML_OP_MEAN: {
             if (src0_needs_grads) {
-                ggml_add1_or_set(ctx, cgraph, isrc0, ggml_scale_impl(ctx, grad, 1.0f/src0->ne[0], 0.0, false));
+                ggml_add_or_set(ctx, cgraph, isrc0, ggml_repeat(ctx, ggml_scale_impl(ctx, grad, 1.0f/src0->ne[0], 0.0, false), src0));
             }
         } break;
         case GGML_OP_REPEAT: {

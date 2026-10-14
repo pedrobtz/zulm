@@ -2,6 +2,9 @@
 repository: https://github.com/ggml-org/ggml
 tag: v0.26.0
 commit: d7cb574130e6f01ad25b3289685489200febcd74
+patch: p01-mean-backward-accumulates.patch
+patch: p02-sub-div-broadcast-backward.patch
+patch: p07-opt-global-norm-clipping.patch
 patch: p08-c23-static-assert.patch
 patch: p09-gguf-type-range.patch
 patch: p10-function-pointer-types.patch
@@ -19,7 +22,7 @@ d114067f9099c4a0e2bbc0625c676d4894d9cf0ea27168ee072c7de0e71bb51d  include/ggml-a
 5791edae1fb7622027621d15bc7a160198bd3b75ed8f96d06cb7b85e2b873756  include/ggml-backend.h
 bc15ba002c68685df23faae42df0d2b3d58032011f88b649021ab92485862c72  include/ggml-cpp.h
 316279e004cdeb8e6ef78599acb602bf79a8abdf897fed9fd1914808c1518c6e  include/ggml-cpu.h
-3586de1bc8a934b5c72339e2b6937b0641e8f149b512231e666f67de0736eea2  include/ggml-opt.h
+a18d3d292108e4a7554be4cc115e6818eaee4857a465957f45f6507ff1a47d4f  include/ggml-opt.h
 12ee71f99db7db9b353bc02b1fbb57c344ee17c01ac5fb7952b41a637a747ea9  include/ggml.h
 e56714aab702e5ce62ee587a409643c08f7e93e8fbb77f48ef7cc85075f96fa4  include/gguf.h
 9664bda3e9c4223f5c94ebfeb3c0381f0065a5091ddae707c09a800f7e419a39  src/ggml-alloc.c
@@ -69,11 +72,11 @@ e63b382766f1b8c5ded1577be9704e85cb4e9cd24584f3e1474911a40146df33  src/ggml-cpu/u
 885a50e405f20f75ea70cb7fb062934812beffc9229ddb56a003aa150163d2fa  src/ggml-cpu/vec.h
 4490179fd8c6df80fe29fc602ed7236eb828c51e9c379efb0dd510cb5cb81fec  src/ggml-feats.h
 c11596c58c05260b14c748a32b17ef71ef556ec29590cfd89c5e52316cb9302f  src/ggml-impl.h
-e35fd27856e37f3611d3bc6f17ee963be51bfe92bec96fad0a9fa2c7ebbe9c46  src/ggml-opt.cpp
+51f09595accc071d004509a335e9f0329e88b40188d60a643bc8c7c0e8102d12  src/ggml-opt.cpp
 5574a2dccf7c07e75b143733e04a5412d3d8c819e7945f5217a7b83a2b2ff8ab  src/ggml-quants.c
 28ae5fca1f3be636b36cd6c4fa2ca74fd42d229bfbd5352eaf66f3727bb8a6da  src/ggml-quants.h
 13a18d885393722b7c9f42d4cf8575a4d41699926d656f78a867fa4fac9dad20  src/ggml-threading.cpp
 9652729043ed91482392c1aa08af5d813190d0ace2e7982d2539d28240ab8d8b  src/ggml-threading.h
-e49b07c83f087f28eee3348524ff0dbf38045682cff7daebd734624ec5c3f198  src/ggml-version.h
-e908ae3656475b02542f92413de5e8f4b688e72ede96a0ed163d088f33cf53f5  src/ggml.c
+42aeef24eef60e34de738c242ba8a8e71bc388e53343a204a72f31c10559bc6d  src/ggml-version.h
+f08cda69f6d9271ddcffe39cdf7e28d60c56201732baa8b4d99feaec3909e860  src/ggml.c
 59619f942e04316a703f0431b5cc4ce68ae337eb39786ed79f762a9a4cd69cb3  src/gguf.cpp

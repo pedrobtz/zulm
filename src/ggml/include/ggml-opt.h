@@ -94,6 +94,7 @@ extern "C" {
             float alpha; // learning rate
             float wd;    // weight decay
         } sgd;
+        float clip; // clip gradients to this global L2 norm before the step - 0.0f to disable
     };
 
     // callback to calculate optimizer parameters prior to a backward pass

@@ -67,6 +67,7 @@ struct ggml_opt_context {
     ggml_opt_get_optimizer_params get_opt_pars    = nullptr;
     void *                        get_opt_pars_ud = nullptr;
     struct ggml_tensor *          opt_step_params = nullptr; // Stores output of get_opt_pars.
+    struct ggml_tensor *          opt_clip_params = nullptr; // Gradient clipping norm from get_opt_pars.
 
     enum ggml_opt_optimizer_type optimizer = GGML_OPT_OPTIMIZER_TYPE_ADAMW;
 };
@@ -234,6 +235,8 @@ struct ggml_opt_optimizer_params ggml_opt_get_default_optimizer_params(void * us
     result.sgd.alpha   = 1e-3f;
     result.sgd.wd      = 0.0f;
 
+    result.clip        = 0.0f;
+
     return result;
 }
 
@@ -368,7 +371,8 @@ static void ggml_opt_build(ggml_opt_context_t opt_ctx) {
         // The cpu context is allocated statically if using static graphs, dynamically otherwise.
         // It is used for:
         //   - optimizer parameters (1 shared for all optimizer invocations)
-        const size_t size_meta = 1 * ggml_tensor_overhead();
+        //   - gradient clipping norm (1)
+        const size_t size_meta = 2 * ggml_tensor_overhead();
         struct ggml_init_params params = {
             /*.mem_size   =*/ size_meta,
             /*.mem_buffer =*/ nullptr,
@@ -508,6 +512,38 @@ static void ggml_opt_build(ggml_opt_context_t opt_ctx) {
     ggml_set_input(adamw_params);
     const char * optimizer_name = ggml_opt_optimizer_name(opt_ctx->optimizer);
     ggml_format_name(adamw_params, "%s_params", optimizer_name);
+
+    // Global-norm gradient clipping: every gradient the step reads is scaled
+    // by clip / max(norm, clip), where norm is the L2 norm of all parameter
+    // gradients together. max(norm, clip) is written clip + relu(norm - clip);
+    // with clipping disabled the clip input is a large finite value, so the
+    // scale is exactly 1.
+    opt_ctx->opt_clip_params = ggml_new_tensor_1d(opt_ctx->ctx_cpu, GGML_TYPE_F32, 1);
+    ggml_set_input(opt_ctx->opt_clip_params);
+    ggml_set_name(opt_ctx->opt_clip_params, "grad_clip_params");
+    struct ggml_tensor * grad_sumsq = nullptr;
+    for (int i = opt_ctx->gf->n_nodes-1; i >= 0; --i) {
+        struct ggml_tensor * node = opt_ctx->gb_opt->nodes[i];
+        struct ggml_tensor * grad = ggml_graph_get_grad(opt_ctx->gb_opt, node);
+        if (grad && (node->flags & GGML_TENSOR_FLAG_PARAM)) {
+            // a gradient can be a view (of a permuted parameter, say): the
+            // kernels below need contiguous rows
+            if (!ggml_is_contiguous(grad)) {
+                grad = ggml_cont(opt_ctx->ctx_compute, grad);
+            }
+            struct ggml_tensor * sumsq = ggml_sum(opt_ctx->ctx_compute, ggml_sqr(opt_ctx->ctx_compute, grad));
+            grad_sumsq = grad_sumsq ? ggml_add(opt_ctx->ctx_compute, grad_sumsq, sumsq) : sumsq;
+        }
+    }
+    struct ggml_tensor * clip_scale = nullptr;
+    if (grad_sumsq) {
+        struct ggml_tensor * clip   = opt_ctx->opt_clip_params;
+        struct ggml_tensor * norm   = ggml_sqrt(opt_ctx->ctx_compute, grad_sumsq);
+        struct ggml_tensor * excess = ggml_relu(opt_ctx->ctx_compute, ggml_sub(opt_ctx->ctx_compute, norm, clip));
+        clip_scale = ggml_div(opt_ctx->ctx_compute, clip, ggml_add(opt_ctx->ctx_compute, clip, excess));
+        ggml_set_name(clip_scale, "grad_clip_scale");
+    }
+
     for (int i = opt_ctx->gf->n_nodes-1; i >= 0; --i) {
         struct ggml_tensor * node = opt_ctx->gb_opt->nodes[i];
         struct ggml_tensor * grad = ggml_graph_get_grad(opt_ctx->gb_opt, node);
@@ -520,6 +556,11 @@ static void ggml_opt_build(ggml_opt_context_t opt_ctx) {
                 v = opt_ctx->grad_v[i];
                 ggml_format_name(m, "AdamW m for %s", node->name);
                 ggml_format_name(v, "AdamW v for %s", node->name);
+            }
+            if (clip_scale) {
+                // the step kernels read the gradient with the weight's
+                // strides, so it must be contiguous: the product is
+                grad = ggml_mul(opt_ctx->ctx_compute, ggml_is_contiguous(grad) ? grad : ggml_cont(opt_ctx->ctx_compute, grad), clip_scale);
             }
             struct ggml_tensor * opt_step;
             switch (optimizer) {
@@ -819,6 +860,9 @@ void ggml_opt_eval(ggml_opt_context_t opt_ctx, ggml_opt_result_t result) {
             default:
                 GGML_ABORT("fatal error");
         }
+
+        GGML_ASSERT(opt_pars.clip >= 0.0f);
+        *ggml_get_data_f32(opt_ctx->opt_clip_params) = opt_pars.clip > 0.0f ? opt_pars.clip : 1e30f;
     }
 
     ggml_backend_sched_graph_compute(opt_ctx->backend_sched, opt_ctx->allocated_graph_copy);
