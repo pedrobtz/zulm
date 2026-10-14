@@ -191,3 +191,26 @@
   keep f16 and bf16 parameters in their type, and
   `zl_param_names(types = TRUE)` reports types. The documentation states
   their cost in precision.
+
+- State tensors:
+  [`zl_state()`](https://pedrobtz.github.io/zulm/reference/zl_state.md)
+  declares a persistent tensor that graphs read through
+  [`zl_param_tensor()`](https://pedrobtz.github.io/zulm/reference/zl_params.md)
+  and write with
+  [`zl_state_write()`](https://pedrobtz.github.io/zulm/reference/zl_state.md);
+  [`zl_state_get()`](https://pedrobtz.github.io/zulm/reference/zl_state.md)
+  and
+  [`zl_state_set()`](https://pedrobtz.github.io/zulm/reference/zl_state.md),
+  with `offset`, read and write it from R. States are neither trained
+  nor saved. A key-value cache for incremental decoding is built from
+  them.
+
+- [`zl_graph_cache()`](https://pedrobtz.github.io/zulm/reference/zl_graph_cache.md)
+  builds a graph per new set of input shapes for
+  [`zl_forward()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md),
+  and frees the least recently used under `getOption("zulm.max_bytes")`.
+
+- [`zl_crossprod()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md)
+  accepts a transposed vector as its first argument, as
+  [`zl_attention()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
+  makes for a single position.

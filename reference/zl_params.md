@@ -73,7 +73,8 @@ zl_param_tensor(p, name)
 return the store invisibly. `zl_param_get()` returns a double vector or
 array; `zl_param_names()` the names in the order added;
 `zl_param_count()` the total number of values; `zl_param_tensor()` a
-handle for use when building a graph.
+handle for use when building a graph, for a parameter or a state tensor
+([`zl_state()`](https://pedrobtz.github.io/zulm/reference/zl_state.md)).
 
 ## Details
 

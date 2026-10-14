@@ -65,6 +65,9 @@
   [`zl_forward()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
   [`zl_graph_info()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
   : Build and run graphs
+- [`zl_graph_cache()`](https://pedrobtz.github.io/zulm/reference/zl_graph_cache.md)
+  [`print(`*`<zl_graph_cache>`*`)`](https://pedrobtz.github.io/zulm/reference/zl_graph_cache.md)
+  : Graphs built once per input shape
 - [`zl_init_normal()`](https://pedrobtz.github.io/zulm/reference/zl_init_normal.md)
   [`zl_init_uniform()`](https://pedrobtz.github.io/zulm/reference/zl_init_normal.md)
   [`zl_init_zeros()`](https://pedrobtz.github.io/zulm/reference/zl_init_normal.md)
@@ -93,6 +96,11 @@
   Save and load parameters as GGUF
 - [`zl_seed()`](https://pedrobtz.github.io/zulm/reference/zl_seed.md) :
   The session's random-number key
+- [`zl_state()`](https://pedrobtz.github.io/zulm/reference/zl_state.md)
+  [`zl_state_get()`](https://pedrobtz.github.io/zulm/reference/zl_state.md)
+  [`zl_state_set()`](https://pedrobtz.github.io/zulm/reference/zl_state.md)
+  [`zl_state_write()`](https://pedrobtz.github.io/zulm/reference/zl_state.md)
+  : State tensors
 - [`zl_threads()`](https://pedrobtz.github.io/zulm/reference/zl_threads.md)
   : Threads
 - [`zl_trainer()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)

@@ -54,7 +54,8 @@ zl_graph_info(g)
 
 - g:
 
-  A graph.
+  A graph; for `zl_forward()`, also a graph cache from
+  [`zl_graph_cache()`](https://pedrobtz.github.io/zulm/reference/zl_graph_cache.md).
 
 - data:
 
