@@ -12,6 +12,7 @@
 
 #include "ggml.h"
 #include "zlm_glue.h"
+#include "zlm_store.h"
 
 SEXP zlm_native_info(void);
 SEXP zlm_log_drain(void);
@@ -28,6 +29,15 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_log_drain", (DL_FUNC) &zlm_log_drain, 0},
   {"zlm_engine_selftest", (DL_FUNC) &zlm_engine_selftest, 1},
   {"zlm_bench_mul_mat", (DL_FUNC) &zlm_bench_mul_mat, 3},
+  {"zlm_store_new", (DL_FUNC) &zlm_store_new, 0},
+  {"zlm_store_free_", (DL_FUNC) &zlm_store_free_, 1},
+  {"zlm_store_add", (DL_FUNC) &zlm_store_add, 6},
+  {"zlm_store_get", (DL_FUNC) &zlm_store_get, 2},
+  {"zlm_store_set", (DL_FUNC) &zlm_store_set, 3},
+  {"zlm_store_info", (DL_FUNC) &zlm_store_info, 1},
+  {"zlm_store_save", (DL_FUNC) &zlm_store_save, 5},
+  {"zlm_store_load", (DL_FUNC) &zlm_store_load, 2},
+  {"zlm_i32_roundtrip", (DL_FUNC) &zlm_i32_roundtrip, 1},
   {NULL, NULL, 0}
 };
 

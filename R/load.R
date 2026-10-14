@@ -78,14 +78,27 @@ zlm_abort_variant <- function(requested, usable, installed) {
   )
 }
 
+# Switching variants never unloads the previous one: objects it created may
+# still be finalised, and their finalisers live in its shared object.
 zlm_load_variant <- function(requested = NULL) {
-  zlm_unload_variant()
   dir <- zlm_variant_dir()
   installed <- zlm_installed_variants(dir)
   supported <- .Call(C_zlm_cpu_variants)
   variant <- zlm_choose_variant(requested, supported, installed)
   path <- file.path(dir, paste0("zulm_", variant, .Platform$dynlib.ext))
-  dll <- dyn.load(path, local = TRUE, now = TRUE)
+  if (is.null(.zlm$loaded)) {
+    .zlm$loaded <- list()
+  }
+  dll <- .zlm$loaded[[variant]]
+  if (is.null(dll)) {
+    # A namespace reloaded in the same session finds its variants loaded
+    # already; loading one again would unload it under live objects.
+    dll <- getLoadedDLLs()[[paste0("zulm_", variant)]]
+    if (is.null(dll) || !identical(normalizePath(dll[["path"]]), normalizePath(path))) {
+      dll <- dyn.load(path, local = TRUE, now = TRUE)
+    }
+    .zlm$loaded[[variant]] <- dll
+  }
   .zlm$dll <- dll
   .zlm$path <- path
   .zlm$variant <- variant
@@ -95,11 +108,10 @@ zlm_load_variant <- function(requested = NULL) {
   invisible(variant)
 }
 
+# At namespace unload the variants stay loaded: a store that outlives the
+# namespace is still finalised by its variant's code.
 zlm_unload_variant <- function() {
-  if (!is.null(.zlm$path)) {
-    try(dyn.unload(.zlm$path), silent = TRUE)
-  }
-  rm(list = ls(.zlm), envir = .zlm)
+  invisible(NULL)
 }
 
 # Calls a routine of the loaded variant.

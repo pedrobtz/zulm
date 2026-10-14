@@ -24,12 +24,12 @@ exit criteria. `CLAUDE.md` orients; the design decides.
 
 ## Current state
 
-Verified 2026-10-14: Stage 1 of the roadmap. ggml v0.26.0's CPU subset is
-vendored and builds as CPU-dispatched variants with a clean
-`R CMD check --as-cran` on every r-actions leg; `zulm_info()` is the only
-exported function. The R API of design §5 starts in Stage 2. Patch drafts
-P1, P2 and P7 wait in `tools/patches/drafts/`; P8 is vendored. None of
-them has an upstream pull request yet (design §9.3).
+Verified 2026-10-14: Stage 2 of the roadmap. ggml v0.26.0's CPU subset is
+vendored and builds as CPU-dispatched variants (Stage 1). Parameter
+stores, initialisers, GGUF persistence and the condition hierarchy exist
+(Stage 2). Graphs and operations start in Stage 3. Patch drafts P1, P2
+and P7 wait in `tools/patches/drafts/`; P8 is vendored. None of them has
+an upstream pull request yet (design §9.3).
 
 ## Stage tracking
 
@@ -127,7 +127,13 @@ Design §4 is the reference. In outline, as the stages build it:
   which is what applies `zlm_compat.h` (no stdio, `abort` or `_Exit` may
   be linked) and the ISA pragmas. Regenerate with `tools/gen-build`.
 - **A variant's shared object is never unloaded.** Objects it created are
-  finalised by its code; `R/load.R` keeps every loaded variant.
+  finalised by its code; `R/load.R` keeps every loaded variant, and a
+  store made under one variant is `zulm_stale_error` under another.
+- **C code raises R errors only through `zlm_raise()`, after freeing its
+  own memory.** `zlm_raise()` longjmps; anything malloc'd or any ggml or
+  gguf context not owned by a protected external pointer leaks.
+- **Store tensors never move.** A store grows by batches; never
+  reallocate a batch, because graphs hold its tensors' addresses.
 - **Results must not depend on the thread count.** Reported losses are
   fixed-order sums of per-row values and random draws come from
   `zurand` under keys, never from a thread-local generator (design §6.5).

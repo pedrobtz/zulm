@@ -3,7 +3,9 @@
 
 ZLM_COMMON = zlm_glue.o \
   zlm_log.o \
+  zlm_r.o \
   zlm_shim.o \
+  zlm_store.o \
   zlm_v/common/ggml.o \
   zlm_v/common/ggml-alloc.o \
   zlm_v/common/ggml-quants.o \

@@ -13,3 +13,17 @@
 
 * Installing from source with `ZULM_CFLAGS` and `ZULM_CXXFLAGS` set builds
   one variant for the local CPU (not on Windows).
+
+* Parameter stores: `zl_params()`, `zl_param()` with `init` and `type`
+  (`"f32"`, `"f16"` or `"bf16"`), `zl_param_get()`, `zl_param_set()`,
+  `zl_param_names()`, `zl_param_count()` and `zl_param_tensor()`;
+  initialisers `zl_init_normal()`, `zl_init_uniform()`, `zl_init_zeros()`
+  and `zl_init_ones()`, drawing from 'zurand' under a key derived from the
+  parameter's name.
+
+* `zl_save()` and `zl_load()` write and read stores as GGUF files, with
+  metadata, at f32, f16 or bf16.
+
+* Every error inherits `zulm_error` and every warning `zulm_warning`; see
+  `?"zulm-conditions"` for the classes. Allocations are checked against
+  `getOption("zulm.max_bytes")` (4 GiB by default).

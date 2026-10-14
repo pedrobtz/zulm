@@ -1,0 +1,43 @@
+# GGUF files written by zulm are read by upstream's gguf Python package,
+# and files it writes are read by zl_load() (design §11, Stage 2).
+on:
+  push:
+    branches: [main, master]
+    paths-ignore: ['**.md', '.agents/**', '_pkgdown.yml', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', '.agents/**', '_pkgdown.yml', 'docs/**']
+
+name: interop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  gguf:
+    runs-on: ubuntu-latest
+    env:
+      MAKEFLAGS: -j4
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pip install gguf numpy
+      - run: R CMD INSTALL .
+      - name: zulm writes, gguf-py reads
+        run: |
+          mkdir -p out
+          Rscript tools/interop/gguf-write.R out
+          python tools/interop/gguf-check.py read out
+      - name: gguf-py writes, zulm reads
+        run: |
+          python tools/interop/gguf-check.py write out
+          Rscript tools/interop/gguf-read.R out
