@@ -81,8 +81,10 @@ jobs:
         shell: bash
         run: |
           mkdir -p ~/.R
-          # Windows reads ~/.R/Makevars.win, the others ~/.R/Makevars.
-          echo 'CPPFLAGS += -UGGML_USE_LLAMAFILE' >> ~/.R/Makevars
-          echo 'CPPFLAGS += -UGGML_USE_LLAMAFILE' >> ~/.R/Makevars.win
+          # R on Windows reads ~/.R/Makevars.ucrt first, then
+          # Makevars.win64 and Makevars.win; the others ~/.R/Makevars.
+          for f in Makevars Makevars.ucrt Makevars.win64 Makevars.win; do
+            echo 'CPPFLAGS += -UGGML_USE_LLAMAFILE' >> ~/.R/$f
+          done
           R CMD INSTALL --preclean . > install-plain.log 2>&1 || { tail -50 install-plain.log; exit 1; }
           Rscript tools/bench-variants.R plain
