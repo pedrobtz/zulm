@@ -598,8 +598,9 @@ ggml (vendored, unmodified + patches): ggml-base (graph, autograd,
 R results: doubles (losses, arrays), external pointers (stores, graphs)
 ```
 
-- Three contexts per graph: parameters live in a store's static context
-  with one backend buffer; inputs live in a static context of the
+- Three contexts per graph: parameters live in a store's static
+  contexts, one backend buffer per allocation batch (§6.6, revised in
+  Stage 2); inputs live in a static context of the
   graph's own with its own buffer, because `ggml-opt` asserts that
   inputs of static graphs are allocated statically
   (`ggml_opt_alloc`: "the inputs must be allocated statically"), and a
@@ -917,12 +918,27 @@ the ISA variant, because a result is reproducible only within one.
 
 - Stores, graphs and trainers are external pointers with finalisers. A
   graph keeps its store alive by reference; a trainer keeps its graph.
+- **Stage 2 (2026-10-14): a store is a list of allocation batches.**
+  Each `zl_param()` call and each `zl_load()` allocates one batch: a
+  ggml context for the batch's tensor metadata and one CPU backend
+  buffer for its data. A single buffer for the whole store, as §4 first
+  described it, would have to move every tensor whenever a parameter is
+  added (or over-allocate), and a graph already built on the store would
+  then point at freed memory. Batches never move, so tensor addresses
+  are stable for the store's life, and loading a file is one batch. The
+  scheduler and `ggml-opt` accept parameters spread over several CPU
+  buffers.
 - Memory is allocated when a store is created and when a graph is
   built; nothing grows during `zl_step()`. Each allocation is checked
   against `getOption("zulm.max_bytes")` (default 4 GiB) first;
   exceeding it is `zulm_memory_error`.
 - Objects are not serialisable: `saveRDS()` of a store keeps a dead
-  pointer, and use after reload is `zulm_stale_error`. `zl_save()` is
+  pointer, and use after reload is `zulm_stale_error`. A store made by
+  one ISA variant is `zulm_stale_error` under another (after a forced
+  `options(zulm.variant =)` reload); variant shared objects are never
+  unloaded, so such a store is still freed correctly. A store survives
+  `fork()`: its memory is the child's copy and it holds no thread, so
+  only objects that own threads (Stage 7) are made stale by a fork. `zl_save()` is
   the persistence path, and it persists parameters only: a trainer's
   AdamW moments and step count are not saved, `ggml-opt` exposes no
   public accessor for them, and training resumed from a saved store
