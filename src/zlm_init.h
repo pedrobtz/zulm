@@ -16,6 +16,7 @@
 #include "zlm_graph.h"
 #include "zlm_train.h"
 #include "zlm_rng.h"
+#include "zlm_arrow.h"
 #include "zlm_pool.h"
 #include "zlm_st.h"
 
@@ -85,6 +86,11 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_st_read", (DL_FUNC) &zlm_st_read, 5},
   {"zlm_st_fill", (DL_FUNC) &zlm_st_fill, 7},
   {"zlm_st_write", (DL_FUNC) &zlm_st_write, 4},
+  {"zlm_arrow_open", (DL_FUNC) &zlm_arrow_open, 7},
+  {"zlm_arrow_next", (DL_FUNC) &zlm_arrow_next, 1},
+  {"zlm_batch_fill", (DL_FUNC) &zlm_batch_fill, 2},
+  {"zlm_arrow_state", (DL_FUNC) &zlm_arrow_state, 1},
+  {"zlm_arrow_test_stream", (DL_FUNC) &zlm_arrow_test_stream, 3},
   {NULL, NULL, 0}
 };
 
