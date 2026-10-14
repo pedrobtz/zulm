@@ -96,3 +96,16 @@
   `zl_load_safetensors()` keep f16 and bf16 parameters in their type, and
   `zl_param_names(types = TRUE)` reports types. The documentation states
   their cost in precision.
+
+* State tensors: `zl_state()` declares a persistent tensor that graphs
+  read through `zl_param_tensor()` and write with `zl_state_write()`;
+  `zl_state_get()` and `zl_state_set()`, with `offset`, read and write it
+  from R. States are neither trained nor saved. A key-value cache for
+  incremental decoding is built from them.
+
+* `zl_graph_cache()` builds a graph per new set of input shapes for
+  `zl_forward()`, and frees the least recently used under
+  `getOption("zulm.max_bytes")`.
+
+* `zl_crossprod()` accepts a transposed vector as its first argument, as
+  `zl_attention()` makes for a single position.

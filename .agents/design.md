@@ -1163,7 +1163,17 @@ leaves the training path untouched.
   batch sizes, `n_new`) pays graph construction once per shape; entries
   are evicted least recently used when the store's and graphs' memory
   would pass `getOption("zulm.max_bytes")`. It is an R environment;
-  the C table does not see it (§17).
+  the C table does not see it (§17). **Measured in Stage 9:** a
+  twenty-block model of width 64 (980 nodes) builds in about 21 ms per
+  shape on an Apple M2, against §12's 5 ms; the time is R's, about
+  20 µs per operation, and the miss is recorded in the roadmap.
+- **Reading and writing a state in one graph.** `zl_state_write()`
+  returns the state after the write (ggml's `set_rows` result is a view
+  of the state), and reads made through it follow the write. Writes are
+  expanded into the graph before the outputs, so they run even when no
+  output reads them. Rows are checked on each run like `get_rows`
+  indices, and must also be distinct, since two writes to one row would
+  race across threads.
 - **Preprocessing stays in R.** Running statistics in `double`
   (TimesFM's reversible normalisation, Toto's Welford scaler in
   float64), `asinh` and `sinh`, quantile-crossing repair and finiteness

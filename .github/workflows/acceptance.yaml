@@ -1,6 +1,7 @@
 # Design §15 criterion 2: the §1.1 model trains on synthetic data to the
 # acceptance target, with bit-identical results at one and two threads,
-# and its flow head samples finite values (tests/testthat/test-acceptance.R).
+# and its flow head samples finite values (tests/testthat/test-acceptance.R);
+# and the timing bounds that ordinary builds can hold (design §12).
 on:
   push:
     branches: [main, master]
@@ -37,4 +38,9 @@ jobs:
         shell: Rscript {0}
         run: |
           testthat::test_file("tests/testthat/test-acceptance.R", package = "zulm",
+                              load_package = "installed", stop_on_failure = TRUE)
+      - name: graph construction per shape and the decode loop (design §12)
+        shell: Rscript {0}
+        run: |
+          testthat::test_file("tests/testthat/test-decode.R", package = "zulm",
                               load_package = "installed", stop_on_failure = TRUE)

@@ -502,6 +502,22 @@ once.
 **Design.** §6.9 (state tensors, fixed capacity, graph cache); D34;
 open question 17.
 
+**Deviations (2026-10-14).** Graph construction for a twenty-block model
+(980 nodes) takes about 21 ms per shape on an Apple M2, not under 5 ms:
+the time is R's, about 20 µs per operation across the closures that check
+and wrap each one, against 2.5 µs in C. Building a single-tensor lookup
+for `zl_param_tensor()` and a quiet call path for graph building brought
+it down from 30 ms; going further would mean building modules in C. The
+cache pays it once per shape, so a decode loop over ten block sizes
+spends about 0.2 s building. The acceptance workflow keeps it under
+50 ms. States are read inside `build()` through `zl_param_tensor()`,
+which takes a state's name as well as a parameter's, so no
+`zl_state_tensor()` is added; a graph that writes a state cannot be
+trained (`zl_trainer()` refuses it). `zl_graph_cache()` treats an input
+given as an R integer vector as an i32 input. `input_write_f32_at()`
+and the state members exist in C and are tested through internal entry
+points until Stage 12 registers them.
+
 ## Stage 10 — Flash attention
 
 **Issue.** [#12](https://github.com/pedrobtz/zulm/issues/12), sub-issue of
