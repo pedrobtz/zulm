@@ -7,6 +7,13 @@
 <url><loc>https://pedrobtz.github.io/zulm/index.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/news/index.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/reference/index.html</loc></url>
+<url><loc>https://pedrobtz.github.io/zulm/reference/zl-arith.html</loc></url>
+<url><loc>https://pedrobtz.github.io/zulm/reference/zl-attention.html</loc></url>
+<url><loc>https://pedrobtz.github.io/zulm/reference/zl-loss.html</loc></url>
+<url><loc>https://pedrobtz.github.io/zulm/reference/zl-select.html</loc></url>
+<url><loc>https://pedrobtz.github.io/zulm/reference/zl-shape.html</loc></url>
+<url><loc>https://pedrobtz.github.io/zulm/reference/zl_cast.html</loc></url>
+<url><loc>https://pedrobtz.github.io/zulm/reference/zl_graph.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/reference/zl_init_normal.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/reference/zl_params.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/reference/zl_save.html</loc></url>

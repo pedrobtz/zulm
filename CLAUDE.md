@@ -29,9 +29,10 @@ decides.
 Verified 2026-10-14: Stage 2 of the roadmap. ggml v0.26.0’s CPU subset
 is vendored and builds as CPU-dispatched variants (Stage 1). Parameter
 stores, initialisers, GGUF persistence and the condition hierarchy exist
-(Stage 2). Graphs and operations start in Stage 3. Patch drafts P1, P2
-and P7 wait in `tools/patches/drafts/`; P8 is vendored. None of them has
-an upstream pull request yet (design §9.3).
+(Stage 2). Graphs, every operation of design §5.3 and the forward pass
+exist (Stage 3); training starts in Stage 4. Patch drafts P1, P2 and P7
+wait in `tools/patches/drafts/`; P8 is vendored. None of them has an
+upstream pull request yet (design §9.3).
 
 ## Stage tracking
 
@@ -139,6 +140,13 @@ Design §4 is the reference. In outline, as the stages build it:
   gguf context not owned by a protected external pointer leaks.
 - **Store tensors never move.** A store grows by batches; never
   reallocate a batch, because graphs hold its tensors’ addresses.
+- **Never allocate a graph’s original nodes.**
+  [`zl_forward()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
+  runs a copy (`zlm_dup.cpp`); `ggml-opt` copies inherit data pointers,
+  so an allocated original would make training read reused memory.
+- **Every new operation needs its validation in `validate()`**
+  (`zlm_graph.c`): ggml asserts in builders and in kernels, and a kernel
+  assertion during compute is fatal. Only f32 enters operations.
 - **Results must not depend on the thread count.** Reported losses are
   fixed-order sums of per-row values and random draws come from `zurand`
   under keys, never from a thread-local generator (design §6.5).

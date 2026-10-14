@@ -46,3 +46,58 @@
   [`?"zulm-conditions"`](https://pedrobtz.github.io/zulm/reference/zulm-conditions.md)
   for the classes. Allocations are checked against
   `getOption("zulm.max_bytes")` (4 GiB by default).
+
+- Graphs:
+  [`zl_graph()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
+  builds a graph once from an R function,
+  [`zl_int()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
+  declares integer inputs,
+  [`zl_forward()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
+  runs it any number of times on new inputs, and
+  [`zl_graph_info()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
+  describes it.
+
+- Operations on tensors inside a graph: `+`, `-`, `*`, `/` with
+  broadcasting,
+  [`zl_scale()`](https://pedrobtz.github.io/zulm/reference/zl-arith.md),
+  [`zl_sum()`](https://pedrobtz.github.io/zulm/reference/zl-arith.md),
+  [`zl_sum_rows()`](https://pedrobtz.github.io/zulm/reference/zl-arith.md),
+  [`zl_mean_rows()`](https://pedrobtz.github.io/zulm/reference/zl-arith.md),
+  [`zl_cumsum()`](https://pedrobtz.github.io/zulm/reference/zl-arith.md),
+  the elementwise functions
+  ([`zl_sqr()`](https://pedrobtz.github.io/zulm/reference/zl-arith.md)
+  to
+  [`zl_tanh()`](https://pedrobtz.github.io/zulm/reference/zl-arith.md),
+  [`zl_gelu()`](https://pedrobtz.github.io/zulm/reference/zl-arith.md)),
+  [`zl_swiglu()`](https://pedrobtz.github.io/zulm/reference/zl-arith.md),
+  [`zl_crossprod()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md),
+  [`zl_reshape()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md),
+  [`zl_permute()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md),
+  [`zl_t()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md),
+  [`zl_cont()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md),
+  [`zl_view()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md),
+  [`zl_concat()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md),
+  [`zl_pad()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md),
+  [`zl_get_rows()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md),
+  [`zl_where()`](https://pedrobtz.github.io/zulm/reference/zl-select.md),
+  [`zl_clamp()`](https://pedrobtz.github.io/zulm/reference/zl-select.md),
+  [`zl_tri()`](https://pedrobtz.github.io/zulm/reference/zl-select.md),
+  [`zl_softmax()`](https://pedrobtz.github.io/zulm/reference/zl-attention.md)
+  with masks,
+  [`zl_causal_mask()`](https://pedrobtz.github.io/zulm/reference/zl-attention.md),
+  [`zl_rope()`](https://pedrobtz.github.io/zulm/reference/zl-attention.md)
+  in both conventions,
+  [`zl_rms_norm()`](https://pedrobtz.github.io/zulm/reference/zl-attention.md),
+  [`zl_layer_norm()`](https://pedrobtz.github.io/zulm/reference/zl-attention.md),
+  the losses
+  [`zl_cross_entropy()`](https://pedrobtz.github.io/zulm/reference/zl-loss.md),
+  [`zl_mse()`](https://pedrobtz.github.io/zulm/reference/zl-loss.md) and
+  [`zl_mae()`](https://pedrobtz.github.io/zulm/reference/zl-loss.md),
+  and
+  [`zl_cast()`](https://pedrobtz.github.io/zulm/reference/zl_cast.md).
+
+- Every argument ‘ggml’ would assert on is checked first; an assertion
+  that still happens while a graph is built is `zulm_engine_error`.
+
+- ‘ggml’’s log becomes messages of class `zulm_message`, at the level of
+  `options(zulm.log =)` (`"warn"` by default).
