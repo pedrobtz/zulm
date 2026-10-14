@@ -62,3 +62,7 @@
 
 * The bundled 'ggml' carries patches for the gradients of `MEAN`, `SUB`
   and `DIV` with broadcasting, and for gradient clipping in 'ggml-opt'.
+
+* A NaN reaching `zl_softmax()` no longer stops R, a transposed column
+  enters arithmetic and other kernels correctly, and graphs reserve
+  memory as they grow rather than for the largest graph.

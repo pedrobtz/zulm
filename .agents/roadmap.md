@@ -300,7 +300,13 @@ has no gradient in ggml and is refused on a gradient path. Valgrind's
 runner ran out of memory on the gradient tests: the trainer's scheduler
 is now sized for `ggml-opt`'s graphs, and `zl_graph()` and `zl_trainer()`
 collect garbage when unreferenced objects hold over 128 MB outside R's
-heap (design §6.6). Stage 1 was to
+heap (design §6.6); contexts are sized by use, since valgrind pays for
+reserved memory. Three crashes that fuzzing found later, in Stage 13 but
+in Stage 3's code, are fixed here: ggml's debug `assert()` aborting R on
+a NaN in softmax (ggml's sources are now compiled with `NDEBUG`, as
+upstream's release builds are), a transposed column reaching kernels
+that assert dense rows, and a negative `eps` reaching `rms_norm` from
+C. Stage 1 was to
 add the vendored copyright holders to `Authors@R`; this stage does, with
 `inst/COPYRIGHTS`.
 
