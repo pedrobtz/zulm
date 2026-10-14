@@ -197,8 +197,12 @@ Workflows come from `pedrobtz/r-actions`, pinned to `@v1`: `r-cmd-check.yml`
 `vendor.yml`, plus the pkgdown workflow. Local workflows:
 `build-flags` (fails on the non-portable-flag, pragma and compiled-code
 NOTEs and on any export besides `R_init_`), `portability` (the native
-hooks), `measure` (the §13.1 numbers, informational) and `vendor`
-(re-vendors the tag and checks the generated build files).
+hooks), `measure` (the §13.1 numbers, informational), `vendor`
+(re-vendors the tag and checks the generated build files) and `interop`
+(GGUF against upstream's Python package). `native-checks` calls
+r-actions' sanitizers, valgrind, LTO, gctorture, rchk, analyzers and
+cran-special workflows; rchk installs zurand from GitHub, and the
+analyzers report ggml's own findings apart.
 
 Small edits get a small run. The shared workflows look at the files a pull
 request changes, compared with its merge base:
