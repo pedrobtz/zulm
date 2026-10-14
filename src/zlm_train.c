@@ -451,8 +451,8 @@ SEXP zlm_trainer_new(SEXP gptr, SEXP loss_h, SEXP optimizer, SEXP pars, SEXP acc
   ggml_backend_cpu_set_n_threads(t->backend, Rf_asInteger(threads) > 0 ? Rf_asInteger(threads) : 1);
   /* ggml-opt duplicates every training graph at the forward graph's size,
      GGML_DEFAULT_GRAPH_SIZE, so no graph the scheduler sees is larger; the
-     scheduler's tables grow with this size and are reset on every step */
-  t->sched = ggml_backend_sched_new(&t->backend, NULL, 1, 2 * GGML_DEFAULT_GRAPH_SIZE, false, false);
+     scheduler's tables and its reserve for splits grow with this size */
+  t->sched = ggml_backend_sched_new(&t->backend, NULL, 1, GGML_DEFAULT_GRAPH_SIZE, false, false);
   if (t->sched == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory creating a scheduler.");
   struct opt_job j;
   j.t = t;
@@ -481,10 +481,15 @@ SEXP zlm_trainer_new(SEXP gptr, SEXP loss_h, SEXP optimizer, SEXP pars, SEXP acc
     zlm_raise(st == ZLM_STATUS_ENGINE ? "zulm_engine_error" : "zulm_internal_error", R_NilValue,
               "ggml-opt could not build the training graphs: %s", msg[0] ? msg : "unknown error");
   }
-  /* ggml-opt's graphs and the scheduler's tables, measured at about 1 MB,
-     beside the scheduler's buffer, which ggml reports */
+  /* what the trainer reserves: ggml-opt's context, the scheduler's buffer,
+     which ggml reports, and the scheduler's own reserve for splits, which
+     it does not (graph size x GGML_SCHED_MAX_SPLIT_INPUTS x 2 tensors, as
+     ggml_backend_sched_new() computes it; 5 MB with the 4 Makevars sets),
+     and ggml-opt's other tables, about 1 MB */
   t->bytes_live = 1.0 * 1024 * 1024 + (double) ggml_get_mem_size(t->ctx_opt) +
-                  (double) ggml_backend_sched_get_buffer_size(t->sched, t->backend);
+                  (double) ggml_backend_sched_get_buffer_size(t->sched, t->backend) +
+                  (double) GGML_DEFAULT_GRAPH_SIZE * GGML_SCHED_MAX_SPLIT_INPUTS * 2 * sizeof(struct ggml_tensor) +
+                  (double) ggml_graph_overhead_custom(GGML_DEFAULT_GRAPH_SIZE, false);
   zlm_live_add(t->bytes_live);
   UNPROTECT(1);
   return tptr;

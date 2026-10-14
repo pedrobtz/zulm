@@ -991,7 +991,8 @@ the ISA variant, because a result is reproducible only within one.
   doubles when full; the finished graph, its forward copy and the
   backward pass's contexts are sized from the graph's own node count;
   and a trainer gives `ggml-opt` a context of its own sized for
-  `GGML_DEFAULT_GRAPH_SIZE`. zulm also
+  `GGML_DEFAULT_GRAPH_SIZE`, and the scheduler's reserve for split
+  inputs is set by `GGML_SCHED_MAX_SPLIT_INPUTS` (below). zulm also
   counts what live graphs and trainers hold, and `zl_graph()` and
   `zl_trainer()` run a full collection first when that count has
   doubled since the last one and passed 128 MB.
@@ -1655,6 +1656,10 @@ static inline const zulm_api *zulm_api_get(void);
   pattern so that a re-vendoring cannot reintroduce one. The warnings
   the pragmas silenced then appear in the install log, which is
   acceptable (§13.3).
+- `GGML_SCHED_MAX_SPLIT_INPUTS=4` (Stage 4): the scheduler reserves
+  graph size × this × 2 tensors for split inputs, 41 MB a trainer at
+  upstream's 30, and the one CPU backend copies none; it grows its lists
+  on demand if ever needed.
 - `GGML_USE_CPU_REPACK` and `GGML_SCHED_MAX_COPIES=4` as upstream's
   CMake defines them, and the feature-test macros it sets per platform
   (`_XOPEN_SOURCE=600`, `_GNU_SOURCE` on Linux, `_DARWIN_C_SOURCE` on
@@ -2260,7 +2265,8 @@ the target, `x86_64`, `arm64`, `generic` or a `native_*` set):
 # src/Makevars.in (design §13.4)
 CXX_STD = CXX17
 PKG_CPPFLAGS = -I. -Iggml/include -Iggml/src -Iggml/src/ggml-cpu \
-  -DGGML_USE_CPU_REPACK -DGGML_USE_LLAMAFILE -DGGML_SCHED_MAX_COPIES=4 -pthread
+  -DGGML_USE_CPU_REPACK -DGGML_USE_LLAMAFILE -DGGML_SCHED_MAX_COPIES=4 \
+  -DGGML_SCHED_MAX_SPLIT_INPUTS=4 -pthread
 PKG_CFLAGS = $(C_VISIBILITY) $(ZULM_CFLAGS)
 PKG_CXXFLAGS = $(CXX_VISIBILITY) $(ZULM_CXXFLAGS)
 PKG_LIBS = -pthread
