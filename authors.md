@@ -4,6 +4,9 @@
 
 - **Pedro Baltazar**. Author, maintainer, copyright holder.
 
+- **The ggml authors**. Copyright holder.  
+  Bundled 'ggml' library; see inst/COPYRIGHTS
+
 ## Citation
 
 Source:

@@ -43,7 +43,7 @@
 </div>
 <div class="section level2">
 <h2 id="current-state">Current state<a class="anchor" aria-label="anchor" href="#current-state"></a></h2>
-<p>Verified 2026-10-14: Stage 2 of the roadmap. ggml v0.26.0’s CPU subset is vendored and builds as CPU-dispatched variants (Stage 1). Parameter stores, initialisers, GGUF persistence and the condition hierarchy exist (Stage 2). Graphs, every operation of design §5.3 and the forward pass exist (Stage 3); training starts in Stage 4. Patch drafts P1, P2 and P7 wait in <code>tools/patches/drafts/</code>; P8 is vendored. None of them has an upstream pull request yet (design §9.3).</p>
+<p>Verified 2026-10-14: Stage 4 of the roadmap. ggml v0.26.0’s CPU subset is vendored and builds as CPU-dispatched variants (Stage 1). Parameter stores, initialisers, GGUF persistence and the condition hierarchy exist (Stage 2). Graphs, every operation of design §5.3 and the forward pass exist (Stage 3). Training through <code>ggml-opt</code> with AdamW and SGD, accumulation and clipping exists (Stage 4); random numbers in graphs start in Stage 5. Patches P1, P2, P7, P8, P9 and P10 are vendored from <code>tools/patches/</code>; none has an upstream pull request yet (design §9.3).</p>
 </div>
 <div class="section level2">
 <h2 id="stage-tracking">Stage tracking<a class="anchor" aria-label="anchor" href="#stage-tracking"></a></h2>
@@ -115,6 +115,8 @@
 <strong>Never allocate a graph’s original nodes.</strong> <code><a href="reference/zl_graph.html">zl_forward()</a></code> runs a copy (<code>zlm_dup.cpp</code>); <code>ggml-opt</code> copies inherit data pointers, so an allocated original would make training read reused memory.</li>
 <li>
 <strong>Every new operation needs its validation in <code>validate()</code></strong> (<code>zlm_graph.c</code>): ggml asserts in builders and in kernels, and a kernel assertion during compute is fatal. Only f32 enters operations.</li>
+<li>
+<strong>Training graphs stay unallocated and small.</strong> <code>ggml-opt</code> trains on the original nodes with static graphs and builds its forward graph at <code>GGML_DEFAULT_GRAPH_SIZE</code> (2048 nodes between parameters and loss); <code><a href="reference/zl_trainer.html">zl_grad()</a></code> builds its own backward graph on a copy. Every operation on a gradient path needs a rule in the backward pre-check (<code>zlm_train.c</code>), or ggml aborts during <code>ggml_build_backward_expand()</code>.</li>
 <li>
 <strong>Results must not depend on the thread count.</strong> Reported losses are fixed-order sums of per-row values and random draws come from <code>zurand</code> under keys, never from a thread-local generator (design §6.5).</li>
 </ul></div>

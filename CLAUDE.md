@@ -26,13 +26,14 @@ decides.
 
 ## Current state
 
-Verified 2026-10-14: Stage 2 of the roadmap. ggml v0.26.0’s CPU subset
+Verified 2026-10-14: Stage 4 of the roadmap. ggml v0.26.0’s CPU subset
 is vendored and builds as CPU-dispatched variants (Stage 1). Parameter
 stores, initialisers, GGUF persistence and the condition hierarchy exist
 (Stage 2). Graphs, every operation of design §5.3 and the forward pass
-exist (Stage 3); training starts in Stage 4. Patch drafts P1, P2 and P7
-wait in `tools/patches/drafts/`; P8 is vendored. None of them has an
-upstream pull request yet (design §9.3).
+exist (Stage 3). Training through `ggml-opt` with AdamW and SGD,
+accumulation and clipping exists (Stage 4); random numbers in graphs
+start in Stage 5. Patches P1, P2, P7, P8, P9 and P10 are vendored from
+`tools/patches/`; none has an upstream pull request yet (design §9.3).
 
 ## Stage tracking
 
@@ -147,6 +148,13 @@ Design §4 is the reference. In outline, as the stages build it:
 - **Every new operation needs its validation in `validate()`**
   (`zlm_graph.c`): ggml asserts in builders and in kernels, and a kernel
   assertion during compute is fatal. Only f32 enters operations.
+- **Training graphs stay unallocated and small.** `ggml-opt` trains on
+  the original nodes with static graphs and builds its forward graph at
+  `GGML_DEFAULT_GRAPH_SIZE` (2048 nodes between parameters and loss);
+  [`zl_grad()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  builds its own backward graph on a copy. Every operation on a gradient
+  path needs a rule in the backward pre-check (`zlm_train.c`), or ggml
+  aborts during `ggml_build_backward_expand()`.
 - **Results must not depend on the thread count.** Reported losses are
   fixed-order sums of per-row values and random draws come from `zurand`
   under keys, never from a thread-local generator (design §6.5).

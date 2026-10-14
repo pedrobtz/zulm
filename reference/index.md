@@ -46,6 +46,9 @@
   [`zl_pad()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md)
   [`zl_get_rows()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md)
   : Products and shapes of tensors
+- [`zl_adamw()`](https://pedrobtz.github.io/zulm/reference/zl_adamw.md)
+  [`zl_sgd()`](https://pedrobtz.github.io/zulm/reference/zl_adamw.md) :
+  Optimisers
 - [`zl_cast()`](https://pedrobtz.github.io/zulm/reference/zl_cast.md) :
   Convert a tensor's type
 - [`zl_graph()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
@@ -69,6 +72,11 @@
 - [`zl_save()`](https://pedrobtz.github.io/zulm/reference/zl_save.md)
   [`zl_load()`](https://pedrobtz.github.io/zulm/reference/zl_save.md) :
   Save and load parameters as GGUF
+- [`zl_trainer()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  [`zl_step()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  [`zl_grad()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  [`zl_reset()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  : Train a graph
 - [`zulm-conditions`](https://pedrobtz.github.io/zulm/reference/zulm-conditions.md)
   : Conditions signalled by zulm
 - [`zulm_info()`](https://pedrobtz.github.io/zulm/reference/zulm_info.md)

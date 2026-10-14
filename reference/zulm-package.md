@@ -27,3 +27,8 @@ Useful links:
 Authors:
 
 - Pedro Baltazar <pedrobtz@gmail.com> \[copyright holder\]
+
+Other contributors:
+
+- The ggml authors (Bundled 'ggml' library; see inst/COPYRIGHTS)
+  \[copyright holder\]

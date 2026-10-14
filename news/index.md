@@ -101,3 +101,35 @@
 
 - ‘ggml’’s log becomes messages of class `zulm_message`, at the level of
   `options(zulm.log =)` (`"warn"` by default).
+
+- Training:
+  [`zl_adamw()`](https://pedrobtz.github.io/zulm/reference/zl_adamw.md)
+  and
+  [`zl_sgd()`](https://pedrobtz.github.io/zulm/reference/zl_adamw.md)
+  describe optimisers;
+  [`zl_trainer()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  prepares a graph with a `loss` for training through ‘ggml-opt’, with
+  gradient accumulation and global-norm clipping (`clip_norm`);
+  [`zl_step()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  trains on one batch,
+  [`zl_grad()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  returns a parameter’s gradient, and
+  [`zl_reset()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  clears the optimiser’s state. An operation without a gradient between
+  a parameter and the loss is refused with `zulm_unsupported_backward`,
+  naming it and its call.
+
+- [`zl_graph()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
+  and
+  [`zl_trainer()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  collect garbage when graphs and trainers no longer referenced hold
+  over 128 MB, which R’s collector does not see.
+
+- The bundled ‘ggml’ carries patches for the gradients of `MEAN`, `SUB`
+  and `DIV` with broadcasting, and for gradient clipping in ‘ggml-opt’.
+
+- A NaN reaching
+  [`zl_softmax()`](https://pedrobtz.github.io/zulm/reference/zl-attention.md)
+  no longer stops R, a transposed column enters arithmetic and other
+  kernels correctly, and graphs reserve memory as they grow rather than
+  for the largest graph.
