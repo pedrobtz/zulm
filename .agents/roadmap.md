@@ -28,7 +28,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | 6 | [Modules, the driving model and PyTorch fixtures](#stage-6--modules-the-driving-model-and-pytorch-fixtures) | [#8](https://github.com/pedrobtz/zulm/issues/8) | [#27](https://github.com/pedrobtz/zulm/pull/27) | 2026-10-14 |
 | 7 | [Thread pool, interrupts, fork and determinism](#stage-7--thread-pool-interrupts-fork-and-determinism) | [#9](https://github.com/pedrobtz/zulm/issues/9) | [#28](https://github.com/pedrobtz/zulm/pull/28) | 2026-10-14 |
 | 8 | [safetensors and weight types](#stage-8--safetensors-and-weight-types) | [#10](https://github.com/pedrobtz/zulm/issues/10) | [#29](https://github.com/pedrobtz/zulm/pull/29) | 2026-10-14 |
-| 9 | [State tensors and the graph cache](#stage-9--state-tensors-and-the-graph-cache) | [#11](https://github.com/pedrobtz/zulm/issues/11) | | 2026-10-14 |
+| 9 | [State tensors and the graph cache](#stage-9--state-tensors-and-the-graph-cache) | [#11](https://github.com/pedrobtz/zulm/issues/11) | [#30](https://github.com/pedrobtz/zulm/pull/30) | 2026-10-14 |
 | 10 | [Flash attention](#stage-10--flash-attention) | [#12](https://github.com/pedrobtz/zulm/issues/12) | | |
 | 11 | [Arrow batches](#stage-11--arrow-batches) | [#13](https://github.com/pedrobtz/zulm/issues/13) | | |
 | 12 | [The C table and the zukzeit proof](#stage-12--the-c-table-and-the-zukzeit-proof) | [#14](https://github.com/pedrobtz/zulm/issues/14) | | |
