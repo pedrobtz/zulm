@@ -587,6 +587,19 @@ and chunk rules of design §7.3.
 
 **Design.** §7.3; D17, D21; open question 14.
 
+**Deviations (2026-10-14).** The DuckDB and Parquet fixtures run as
+`tools/acceptance/arrow-duckdb.R` in the acceptance workflow, not as
+package tests: `duckdb` in `Suggests` would be built from source,
+instrumented, in the sanitizer images. The Parquet file is written by
+DuckDB at run time rather than committed. The package tests use
+nanoarrow streams and a counting stream in C, which also runs without
+nanoarrow. `map` marks integer inputs with `zl_int()` around column
+names, which the design left open. A dictionary that changes between
+record batches is an error; levels given up front are not offered.
+Dictionary codes may be unsigned, as DuckDB's are. The R CMD check
+caller now runs r-actions' `nosuggests` leg, and the acceptance workflow
+a job without nanoarrow.
+
 ## Stage 12 — The C table and the zukzeit proof
 
 **Issue.** [#14](https://github.com/pedrobtz/zulm/issues/14), sub-issue of

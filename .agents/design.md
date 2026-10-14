@@ -1425,6 +1425,26 @@ vendors those definitions and nothing else of Arrow.
 
 Windowing rows into sequences of events belongs to zuflow (§7.8).
 
+**As built in Stage 11 (2026-10-14).** `map` is a named list from input
+names to column names, with `zl_int()` around the columns of an i32
+input (`zl_int("kind")`); an f32 input is `c(columns, rows)` and an i32
+input of one column a vector of `rows`. With `na = "mask"` every input
+`x` has a companion `x_mask` of its shape, and with `last = "pad"` every
+batch carries `row_mask`, so shapes do not change at the end. The
+iterator moves the producer's stream out of its external pointer (whose
+release is then a no-op), and releases the stream, its schema and each
+array once; a counting stream in C tests that. Dictionary codes may be
+signed or unsigned integers (DuckDB's `ENUM` arrives with `uint8`
+codes); unsigned value columns stay refused. A dictionary that changes
+between record batches is a `zulm_arrow_error`: levels given up front
+are not offered. `zl_step()` and `zl_forward()` fill the graph's inputs
+straight from the record batches through `batch_fill`, the C member of
+§8, and return `NULL` when the stream has ended. DuckDB hands an Arrow
+stream to R through `DBI::dbGetQueryArrow()`. Training the §1.1 model
+for 12 steps from a DuckDB table, and from a Parquet file read by
+DuckDB, gives losses and parameters bit-identical to training from the
+same rows as R arrays (`tools/acceptance/arrow-duckdb.R`).
+
 RFC 0032 lists Arrow input among zuflow's v0.1.0 features through this
 iterator, which is why it is in zulm's v0.1.0 (D27).
 
