@@ -1,0 +1,37 @@
+From: Pedro Baltazar <pedrobtz@gmail.com>
+Subject: [PATCH P9] gguf : validate a tensor's type before it is a ggml_type
+
+Upstream pull request: (not opened yet; see design §9.3)
+
+gguf_init_from_reader() read a tensor's type straight into the
+enum ggml_type field and then checked its range. A malformed file whose
+type is outside the enumeration loads an invalid enum value first, which
+is undefined in C++ (UBSan: "load of value ..., which is not a valid
+value for type 'ggml_type'"). Read it into an int32_t, check it, then
+convert.
+
+--- a/src/gguf.cpp
++++ b/src/gguf.cpp
+@@ -724,15 +724,19 @@
+ 
+         // tensor type
+         {
+-            ok = ok && gr.read(info.t.type);
++            // read the type as an integer: a value outside the enumeration
++            // must not be loaded into a ggml_type
++            int32_t type = 0;
++            ok = ok && gr.read(type);
+ 
+             // check that tensor type is within defined range
+-            if (info.t.type < 0 || info.t.type >= GGML_TYPE_COUNT) {
++            if (type < 0 || type >= GGML_TYPE_COUNT) {
+                 GGML_LOG_ERROR("%s: tensor '%s' has invalid ggml type %d. should be in [0, %d)\n",
+-                    __func__, info.t.name, info.t.type, GGML_TYPE_COUNT);
++                    __func__, info.t.name, (int) type, GGML_TYPE_COUNT);
+                 ok = false;
+                 break;
+             }
++            info.t.type = (enum ggml_type) type;
+             const size_t  type_size = ggml_type_size(info.t.type);
+             const int64_t blck_size = ggml_blck_size(info.t.type);
+ 

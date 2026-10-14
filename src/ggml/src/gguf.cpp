@@ -724,15 +724,19 @@ static struct gguf_context * gguf_init_from_reader(const struct gguf_reader & gr
 
         // tensor type
         {
-            ok = ok && gr.read(info.t.type);
+            // read the type as an integer: a value outside the enumeration
+            // must not be loaded into a ggml_type
+            int32_t type = 0;
+            ok = ok && gr.read(type);
 
             // check that tensor type is within defined range
-            if (info.t.type < 0 || info.t.type >= GGML_TYPE_COUNT) {
+            if (type < 0 || type >= GGML_TYPE_COUNT) {
                 GGML_LOG_ERROR("%s: tensor '%s' has invalid ggml type %d. should be in [0, %d)\n",
-                    __func__, info.t.name, info.t.type, GGML_TYPE_COUNT);
+                    __func__, info.t.name, (int) type, GGML_TYPE_COUNT);
                 ok = false;
                 break;
             }
+            info.t.type = (enum ggml_type) type;
             const size_t  type_size = ggml_type_size(info.t.type);
             const int64_t blck_size = ggml_blck_size(info.t.type);
 
