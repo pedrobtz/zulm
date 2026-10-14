@@ -18,8 +18,10 @@ test_that("the session is usable after repeated assertions", {
   expect_identical(before, after)
 })
 
-test_that("ggml's writes to stdout and stderr reach the log, not the console", {
+test_that("ggml's log drains into records of a level and a text", {
   out <- zulm:::zlm_call("zlm_log_drain")
-  expect_type(out, "character")
-  expect_length(out, 1L)
+  expect_type(out, "list")
+  expect_length(out, 2L)
+  expect_type(out[[1L]], "integer")
+  expect_type(out[[2L]], "character")
 })
