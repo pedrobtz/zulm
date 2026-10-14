@@ -132,7 +132,12 @@ Ops.zl_node <- function(e1, e2) {
     a <- zlm_as_tensor(e1)
     b <- zlm_as_tensor(e2)
     op <- switch(.Generic, "+" = "add", "-" = "sub", "*" = "mul", "/" = "div")
-    return(zlm_op(op, a, b, rank = max(a$rank, b$rank), call = call))
+    out <- zlm_op(op, a, b, rank = max(a$rank, b$rank), call = call)
+    if (.Generic == "+" && !is.null(a$rowloss) && !is.null(b$rowloss)) {
+      # a sum of losses reports the sum of their per-row sums (design §7.1)
+      out$rowloss <- c(a$rowloss, b$rowloss)
+    }
+    return(out)
   }
   if (t1) {
     a <- zlm_as_tensor(e1)
@@ -586,7 +591,7 @@ zlm_with_rows <- function(loss, a, b, mode, scale, call) {
   rows <- zlm_new_tensor(rl[[1L]], a$graph, 1L)
   hook <- zl_scale(zl_sum(zlm_op("step", rows, call = call)), 0)
   out <- loss + hook
-  out$rowloss <- rl[[2L]]
+  out$rowloss <- list(rl[[2L]])
   out
 }
 
