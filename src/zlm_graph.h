@@ -13,6 +13,7 @@ enum { ZLM_GRAPH_BUILDING = 0, ZLM_GRAPH_READY = 1, ZLM_GRAPH_FAILED = 2 };
 typedef struct {
   struct ggml_tensor *idx; /* an i32 input used as an index */
   int64_t bound;           /* every value must lie in [0, bound) */
+  int unique;              /* and, for state writes, appear once */
 } zlm_index_check;
 
 typedef struct zlm_graph {
@@ -54,6 +55,9 @@ typedef struct zlm_graph {
   /* memory the graph's custom operations point to, freed with it */
   void **aux;
   int n_aux, cap_aux;
+  /* state writes, computed on every run whether used or not */
+  struct ggml_tensor **writes;
+  int n_writes, cap_writes;
   /* constant tensors, each with a context and a buffer of its own */
   struct ggml_context **cctx;
   ggml_backend_buffer_t *cbuf;
@@ -65,6 +69,12 @@ typedef struct zlm_graph {
 } zlm_graph;
 
 zlm_graph *zlm_graph_from(SEXP x);
+
+/* The C table's offset write into an f32 input (design §8, registered in
+   Stage 12): no R calls; 0 on success, nonzero for an unknown input, a
+   graph not ready, an i32 input or a range outside the input. */
+int zlm_api_input_write_f32_at(zlm_graph *g, const char *name, int64_t offset, const float *src, int64_t n);
+SEXP zlm_input_write_at(SEXP gptr, SEXP name, SEXP offset, SEXP values);
 
 #ifdef __cplusplus
 extern "C" {

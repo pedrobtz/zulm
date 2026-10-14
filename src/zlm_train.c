@@ -158,6 +158,7 @@ int zlm_backward_check(SEXP gptr, struct ggml_tensor *loss, int set_params) {
   /* parameters the loss uses, directly or through a view */
   for (int i = 0; i < g->store->n; i++) {
     struct ggml_tensor *w = g->store->tensors[i];
+    if (g->store->kinds[i] != ZLM_KIND_PARAM) continue; /* states are not trained */
     int used = 0;
     for (int k = 0; k < n && !used; k++) {
       for (int j = 0; j < GGML_MAX_SRC && !used; j++) {
