@@ -51,7 +51,7 @@ jobs:
       - name: CPU
         shell: bash
         run: |
-          (lscpu 2>/dev/null || sysctl -a 2>/dev/null | grep machdep.cpu || wmic cpu get name) | head -30
+          (lscpu 2>/dev/null || sysctl -a 2>/dev/null | grep machdep.cpu || powershell -NoProfile -Command "(Get-CimInstance Win32_Processor).Name" || true) | head -30
       - name: variants (the shipped build)
         shell: bash
         run: |

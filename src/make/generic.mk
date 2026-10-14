@@ -35,4 +35,4 @@ ZLM_OBJ_generic = zlm_v/generic/zlm_init.o \
   zlm_v/generic/ggml-cpu_llamafile_sgemm.o
 
 zulm_generic.so: $(ZLM_COMMON) $(ZLM_OBJ_generic)
-	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_generic) $(ALL_LIBS)
+	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_generic) $(ZLM_LDFLAGS_generic) $(ALL_LIBS)

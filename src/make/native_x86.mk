@@ -37,4 +37,4 @@ ZLM_OBJ_native = zlm_v/native_x86/zlm_init.o \
   zlm_v/native_x86/ggml-cpu_arch_x86_repack.o
 
 zulm_native.so: $(ZLM_COMMON) $(ZLM_OBJ_native)
-	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_native) $(ALL_LIBS)
+	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_native) $(ZLM_LDFLAGS_native) $(ALL_LIBS)

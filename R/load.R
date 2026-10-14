@@ -36,13 +36,13 @@ zlm_installed_variants <- function(dir) {
   sub(paste0("^zulm_(.*)\\", ext, "$"), "\\1", files)
 }
 
+# A native build installs one variant, built for the installing CPU, and
+# it is the only one usable; otherwise the variants this CPU supports.
+zlm_usable_variants <- function(supported, installed) {
+  if ("native" %in% installed) "native" else intersect(supported, installed)
+}
+
 zlm_choose_variant <- function(requested, supported, installed) {
-  if ("native" %in% installed) {
-    if (!is.null(requested) && !identical(requested, "native")) {
-      zlm_abort_variant(requested, "native", installed)
-    }
-    return("native")
-  }
   if (!is.null(requested)) {
     if (!is.character(requested) || length(requested) != 1L || is.na(requested)) {
       zlm_abort(
@@ -50,12 +50,13 @@ zlm_choose_variant <- function(requested, supported, installed) {
         "zulm_invalid_argument"
       )
     }
-    if (!requested %in% intersect(supported, installed)) {
-      zlm_abort_variant(requested, intersect(supported, installed), installed)
+    usable <- zlm_usable_variants(supported, installed)
+    if (!requested %in% usable) {
+      zlm_abort_variant(requested, usable, installed)
     }
     return(requested)
   }
-  usable <- intersect(supported, installed)
+  usable <- zlm_usable_variants(supported, installed)
   if (length(usable) == 0L) {
     zlm_abort(
       "No installed zulm variant runs on this CPU.",

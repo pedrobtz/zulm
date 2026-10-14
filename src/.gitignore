@@ -3,3 +3,4 @@
 *.dll
 Makevars
 symbols.rds
+zlm_v/*.map

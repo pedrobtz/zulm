@@ -35,4 +35,4 @@ ZLM_OBJ_native = zlm_v/native_generic/zlm_init.o \
   zlm_v/native_generic/ggml-cpu_llamafile_sgemm.o
 
 zulm_native.so: $(ZLM_COMMON) $(ZLM_OBJ_native)
-	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_native) $(ALL_LIBS)
+	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_native) $(ZLM_LDFLAGS_native) $(ALL_LIBS)

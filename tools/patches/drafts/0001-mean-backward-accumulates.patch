@@ -1,0 +1,24 @@
+From: Pedro Baltazar <pedrobtz@gmail.com>
+Subject: [PATCH P1] ggml : accumulate the MEAN backward gradient with repeat
+
+Upstream pull request: (not opened yet; see design §9.3)
+
+ggml_mean() reduces each row to one value, so its gradient is the
+incoming gradient divided by ne[0], repeated across the row. The backward
+pass added it with ggml_add1_or_set(), which asserts ggml_is_scalar(b)
+once a second consumer has already contributed a gradient: a LayerNorm
+written with ggml_mean() aborted in ggml_opt_init at ggml.c:2158. Repeat
+the scaled gradient to src0's shape and accumulate it with
+ggml_add_or_set(), as SUM_ROWS does.
+
+--- a/src/ggml.c
++++ b/src/ggml.c
+@@ -6885,7 +6885,7 @@
+         } break;
+         case GGML_OP_MEAN: {
+             if (src0_needs_grads) {
+-                ggml_add1_or_set(ctx, cgraph, isrc0, ggml_scale_impl(ctx, grad, 1.0f/src0->ne[0], 0.0, false));
++                ggml_add_or_set(ctx, cgraph, isrc0, ggml_repeat(ctx, ggml_scale_impl(ctx, grad, 1.0f/src0->ne[0], 0.0, false), src0));
+             }
+         } break;
+         case GGML_OP_REPEAT: {

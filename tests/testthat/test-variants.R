@@ -8,20 +8,29 @@ test_that("a variant the CPU supports is loaded", {
 
 test_that("the best usable variant is the default", {
   info <- zulm_info()
-  if (info$variant != "native") {
-    expect_identical(info$variant, info$variants_usable[[1L]])
-  }
+  expect_identical(info$variant, info$variants_usable[[1L]])
+})
+
+test_that("a native build loads its one variant", {
+  info <- zulm_info()
+  skip_if_not(info$variant == "native", "not a native build")
+  expect_identical(info$variants_installed, "native")
+  expect_identical(info$variants_usable, "native")
+  expect_true(nzchar(info$native_cflags) || nzchar(info$native_cxxflags))
 })
 
 test_that("the architecture's variants are installed", {
   info <- zulm_info()
-  skip_if(info$variant == "native")
-  arch <- R.version$arch
-  if (arch %in% c("x86_64", "amd64")) {
-    expect_setequal(info$variants_installed, c("baseline", "sse42", "avx2"))
-  } else if (arch %in% c("aarch64", "arm64")) {
-    expect_setequal(info$variants_installed, "neon")
-  }
+  skip_if(info$variant == "native", "native build")
+  expected <- switch(
+    R.version$arch,
+    x86_64 = ,
+    amd64 = c("baseline", "sse42", "avx2"),
+    aarch64 = ,
+    arm64 = "neon",
+    "generic"
+  )
+  expect_setequal(info$variants_installed, expected)
 })
 
 test_that("options(zulm.variant =) forces each usable variant", {

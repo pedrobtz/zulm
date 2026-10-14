@@ -33,7 +33,7 @@ zulm_info <- function() {
       ggml_commit = native$ggml_commit,
       ggml_patches = patches,
       variant = .zlm$variant,
-      variants_usable = intersect(.zlm$supported, .zlm$installed),
+      variants_usable = zlm_usable_variants(.zlm$supported, .zlm$installed),
       variants_installed = .zlm$installed,
       native_cflags = hooks$ZULM_CFLAGS,
       native_cxxflags = hooks$ZULM_CXXFLAGS,

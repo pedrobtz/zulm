@@ -37,7 +37,7 @@ ZLM_OBJ_baseline = zlm_v/baseline/zlm_init.o \
   zlm_v/baseline/ggml-cpu_arch_x86_repack.o
 
 zulm_baseline.so: $(ZLM_COMMON) $(ZLM_OBJ_baseline)
-	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_baseline) $(ALL_LIBS)
+	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_baseline) $(ZLM_LDFLAGS_baseline) $(ALL_LIBS)
 
 ZLM_OBJ_sse42 = zlm_v/sse42/zlm_init.o \
   zlm_v/sse42/ggml-cpu_ggml-cpu.o \
@@ -58,7 +58,7 @@ ZLM_OBJ_sse42 = zlm_v/sse42/zlm_init.o \
   zlm_v/sse42/ggml-cpu_arch_x86_repack.o
 
 zulm_sse42.so: $(ZLM_COMMON) $(ZLM_OBJ_sse42)
-	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_sse42) $(ALL_LIBS)
+	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_sse42) $(ZLM_LDFLAGS_sse42) $(ALL_LIBS)
 
 ZLM_OBJ_avx2 = zlm_v/avx2/zlm_init.o \
   zlm_v/avx2/ggml-cpu_ggml-cpu.o \
@@ -79,4 +79,4 @@ ZLM_OBJ_avx2 = zlm_v/avx2/zlm_init.o \
   zlm_v/avx2/ggml-cpu_arch_x86_repack.o
 
 zulm_avx2.so: $(ZLM_COMMON) $(ZLM_OBJ_avx2)
-	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_avx2) $(ALL_LIBS)
+	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_avx2) $(ZLM_LDFLAGS_avx2) $(ALL_LIBS)

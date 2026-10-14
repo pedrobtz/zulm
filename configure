@@ -2,6 +2,10 @@
 # Writes src/Makevars: src/Makevars.in plus the variant fragment for the
 # compiler's target architecture (design §13.1). With ZULM_CFLAGS or
 # ZULM_CXXFLAGS set, one variant named "native" is built instead (§13.4).
+# Where the linker takes a version script (GNU ld, gold, lld), each
+# variant is linked with one that exports only its R_init_ function:
+# -fvisibility=hidden does not hide the template instances libstdc++
+# declares with default visibility (design §13.3).
 : "${R_HOME:=$(R RHOME)}"
 CC=$("${R_HOME}/bin/R" CMD config CC)
 macros=$(echo | ${CC} -dM -E - 2>/dev/null)
@@ -22,3 +26,22 @@ else
 fi
 echo "zulm: building the ${set} variant set"
 cat src/Makevars.in "src/make/${set}.mk" > src/Makevars
+
+variants=$(sed -n 's/^ZLM_VARIANTS =//p' "src/make/${set}.mk" | sed 's/zulm_\([A-Za-z0-9]*\)\.so/\1/g')
+tmp=${TMPDIR:-/tmp}/zulm-configure-$$
+mkdir -p "$tmp"
+printf 'int zlm_vs_probe(void) { return 0; }\n' > "$tmp/t.c"
+printf '{ global: zlm_vs_probe; local: *; };\n' > "$tmp/t.map"
+if ${CC} -shared -fPIC -o "$tmp/t.so" "$tmp/t.c" "-Wl,--version-script=$tmp/t.map" > /dev/null 2>&1; then
+  echo "zulm: linking each variant with a version script"
+  {
+    echo
+    echo "# Written by configure: the linker takes a version script."
+    for v in $variants; do
+      printf '{ global: R_init_zulm_%s; local: *; };\n' "$v" > "src/zlm_v/zulm_$v.map"
+      echo "ZLM_LDFLAGS_$v = -Wl,--version-script=zlm_v/zulm_$v.map"
+    done
+  } >> src/Makevars
+fi
+rm -f "$tmp/t.c" "$tmp/t.map" "$tmp/t.so"
+rmdir "$tmp"

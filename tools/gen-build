@@ -124,7 +124,7 @@ fragment() {
       if [ "${ZLM_WIN:-0}" = 1 ]; then
         printf '\t$(SHLIB_LD) -shared $(DLLFLAGS) -o $@ zlm_v/zulm_%s.def $(ZLM_COMMON) $(ZLM_OBJ_%s) $(ALL_LIBS)\n' "$name" "$name"
       else
-        printf '\t$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_%s) $(ALL_LIBS)\n' "$name"
+        printf '\t$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_%s) $(ZLM_LDFLAGS_%s) $(ALL_LIBS)\n' "$name" "$name"
       fi
     done
   } > "make/$file"

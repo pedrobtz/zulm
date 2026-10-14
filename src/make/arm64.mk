@@ -37,4 +37,4 @@ ZLM_OBJ_neon = zlm_v/neon/zlm_init.o \
   zlm_v/neon/ggml-cpu_arch_arm_repack.o
 
 zulm_neon.so: $(ZLM_COMMON) $(ZLM_OBJ_neon)
-	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_neon) $(ALL_LIBS)
+	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_neon) $(ZLM_LDFLAGS_neon) $(ALL_LIBS)
