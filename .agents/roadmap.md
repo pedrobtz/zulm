@@ -546,6 +546,14 @@ and its thread behaviour is measured and recorded.
 
 **Design.** §6.9 (flash attention); open questions 8 and 16.
 
+**Deviations (2026-10-14).** The kernel in v0.26.0 does not require the
+mask to be padded, so none is; it does split a single query's keys
+across threads, so `zl_flash_attention()` computes a single query as two
+identical ones and is thread-invariant everywhere, which answers open
+question 16 with "enabled by default". The 10 240-position test runs in
+the acceptance workflow, under a 64 MB cap, rather than in every check
+leg, since sanitizers and valgrind would take minutes over it.
+
 ## Stage 11 — Arrow batches
 
 **Issue.** [#13](https://github.com/pedrobtz/zulm/issues/13), sub-issue of

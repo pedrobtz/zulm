@@ -44,3 +44,8 @@ jobs:
         run: |
           testthat::test_file("tests/testthat/test-decode.R", package = "zulm",
                               load_package = "installed", stop_on_failure = TRUE)
+      - name: flash attention over a 10 240-position context (design §6.9)
+        shell: Rscript {0}
+        run: |
+          testthat::test_file("tests/testthat/test-flash.R", package = "zulm",
+                              load_package = "installed", stop_on_failure = TRUE)

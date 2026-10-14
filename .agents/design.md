@@ -975,6 +975,13 @@ Measured in the drafting session with upstream at `v0.26.0`:
   the thread count in the last bits. Its backward is elementwise.
 - 1 000 AdamW steps of the §1.1 model ended with bit-identical
   parameters at one and two threads.
+- `flash_attn_ext` (measured in Stage 10 at one, two and four threads)
+  is thread-invariant except on one path: a single query against 512 or
+  more keys splits the keys across threads and combines per-thread
+  partial softmax sums, so its bits depend on the thread count. zulm
+  computes a single query as two identical ones, which takes the
+  row-split path, so `zl_flash_attention()` is thread-invariant at every
+  shape and needs no exception to the contract below.
 - Builds for different instruction sets give different bits (baseline,
   AVX2 and AVX-512 builds ended training with different parameter
   hashes); enabling the llamafile matrix kernels changes bits too.
@@ -1134,7 +1141,17 @@ leaves the training path untouched.
   the context. Stage 10 checks its agreement with the plain
   form within f32 tolerance, and whether its kernel is thread-invariant
   (§17), before any consumer graph uses it; the plain form stays the
-  reference and the training path.
+  reference and the training path. **Measured in Stage 10:** it agrees
+  with the plain form within 4e-7 of the output's scale at every tested
+  shape (one query against 600 keys, grouped keys and values, batches,
+  a mask per head, values of another width), and with R's double
+  precision within 1e-5; it is thread-invariant once a single query is
+  computed twice (§6.5), so it ships enabled. The kernel in v0.26.0
+  needs no padding of the mask, which it reads as f16: 0 and `-Inf` are
+  exact, other additive values are rounded. A 10 240-position context
+  with two heads runs under a 64 MB cap that the plain form's 800 MB of
+  scores cannot meet. The result's layout is upstream's, `c(d_v, heads,
+  n, batch)`, so a reshape joins the heads.
 - **Weight types.** `zl_param(type = "f16" | "bf16")` keeps a parameter
   in that type in memory, and `zl_load()` and `zl_load_safetensors()`
   fill it without widening; `ggml_mul_mat` takes such weights directly.
@@ -2662,12 +2679,12 @@ regrouping; `zl_spectrum()` agrees with `zufft` and `stats::fft()`.
     for anything? Recommended: the member; it is the smaller upstream
     change, it keeps the whole step inside one graph, and no second
     use for a hook is known.
-16. **Flash attention and determinism.** Whether
-    `ggml_flash_attn_ext`'s CPU kernel gives the same bits at every
-    thread count is unmeasured; the plain form does (§6.5).
-    Recommended: measure in Stage 10; if it does not, graphs that use
-    it carry a documented exception to §6.5 above one thread, and
-    zukzeit's parity runs stay on the plain form.
+16. **Flash attention and determinism.** **Answered in Stage 10:**
+    the kernel is thread-invariant except for a single query against
+    512 or more keys, and zulm computes a single query twice to avoid
+    that path, so `zl_flash_attention()` is thread-invariant and ships
+    enabled (§6.5, §6.9). The plain form stays the reference for
+    zukzeit's parity runs, since the two differ in the last bits.
 17. **The graph cache: R or C?** §6.9 keeps it an R environment.
     zuflow's samplers vary no shapes from C, and zukzeit's decode loops
     are in R, so no consumer needs it from the table. Recommended: R

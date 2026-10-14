@@ -109,3 +109,8 @@
 
 * `zl_crossprod()` accepts a transposed vector as its first argument, as
   `zl_attention()` makes for a single position.
+
+* `zl_flash_attention()` is 'ggml''s fused attention, forward only: it
+  agrees with the plain form within f32 rounding, gives the same bits at
+  any thread count, and attends over long contexts in memory linear in
+  their length.
