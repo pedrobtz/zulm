@@ -13,9 +13,13 @@
 #include "ggml.h"
 #include "zlm_glue.h"
 #include "zlm_store.h"
+#include "zlm_graph.h"
 
 SEXP zlm_native_info(void);
 SEXP zlm_log_drain(void);
+SEXP zlm_log_pending_(void);
+SEXP zlm_log_emit(SEXP level, SEXP text);
+void zlm_ggml_log(enum ggml_log_level level, const char *text, void *user);
 SEXP zlm_engine_selftest(SEXP valid);
 SEXP zlm_bench_mul_mat(SEXP n, SEXP reps, SEXP threads);
 
@@ -27,6 +31,8 @@ SEXP zlm_bench_mul_mat(SEXP n, SEXP reps, SEXP threads);
 static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_native_info", (DL_FUNC) &zlm_native_info, 0},
   {"zlm_log_drain", (DL_FUNC) &zlm_log_drain, 0},
+  {"zlm_log_pending_", (DL_FUNC) &zlm_log_pending_, 0},
+  {"zlm_log_emit", (DL_FUNC) &zlm_log_emit, 2},
   {"zlm_engine_selftest", (DL_FUNC) &zlm_engine_selftest, 1},
   {"zlm_bench_mul_mat", (DL_FUNC) &zlm_bench_mul_mat, 3},
   {"zlm_store_new", (DL_FUNC) &zlm_store_new, 0},
@@ -38,6 +44,17 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_store_save", (DL_FUNC) &zlm_store_save, 5},
   {"zlm_store_load", (DL_FUNC) &zlm_store_load, 2},
   {"zlm_i32_roundtrip", (DL_FUNC) &zlm_i32_roundtrip, 1},
+  {"zlm_graph_new", (DL_FUNC) &zlm_graph_new, 6},
+  {"zlm_graph_free_", (DL_FUNC) &zlm_graph_free_, 1},
+  {"zlm_graph_inputs", (DL_FUNC) &zlm_graph_inputs, 1},
+  {"zlm_graph_param", (DL_FUNC) &zlm_graph_param, 2},
+  {"zlm_tensor_info", (DL_FUNC) &zlm_tensor_info, 2},
+  {"zlm_op", (DL_FUNC) &zlm_op, 7},
+  {"zlm_graph_finish", (DL_FUNC) &zlm_graph_finish, 2},
+  {"zlm_graph_abandon", (DL_FUNC) &zlm_graph_abandon, 1},
+  {"zlm_graph_set_input", (DL_FUNC) &zlm_graph_set_input, 3},
+  {"zlm_graph_compute", (DL_FUNC) &zlm_graph_compute, 2},
+  {"zlm_graph_info", (DL_FUNC) &zlm_graph_info, 1},
   {NULL, NULL, 0}
 };
 
@@ -47,4 +64,5 @@ void attribute_visible ZLM_CAT(R_init_zulm_, ZLM_VARIANT)(DllInfo *dll) {
   R_forceSymbols(dll, TRUE);
   zlm_variant_name = ZLM_STR(ZLM_VARIANT);
   ggml_set_abort_callback(zlm_abort_callback);
+  ggml_log_set(zlm_ggml_log, NULL);
 }

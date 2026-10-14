@@ -16,7 +16,9 @@ PKG_LIBS = -pthread
 
 # The registered DLL is the probe alone; the variants are linked below.
 OBJECTS = zulm.o
-ZLM_COMMON = zlm_glue.o \
+ZLM_COMMON = zlm_dup.o \
+  zlm_glue.o \
+  zlm_graph.o \
   zlm_log.o \
   zlm_r.o \
   zlm_shim.o \
