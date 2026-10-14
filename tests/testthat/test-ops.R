@@ -238,12 +238,6 @@ test_that("where, clamp and tri match R", {
   expect_identical(out$ups, tri(x, upper.tri(x[, , 1])))
 })
 
-softmax_cols <- function(x) {
-  m <- matrix(x, dim(x)[1])
-  e <- exp(sweep(m, 2, apply(m, 2, max)))
-  array(sweep(e, 2, colSums(e), "/"), dim(x))
-}
-
 test_that("softmax matches R with masks of every broadcast shape", {
   withr::local_seed(19)
   d <- c(5, 4, 3, 2)
