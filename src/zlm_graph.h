@@ -54,6 +54,10 @@ typedef struct zlm_graph {
   /* memory the graph's custom operations point to, freed with it */
   void **aux;
   int n_aux, cap_aux;
+  /* constant tensors, each with a context and a buffer of its own */
+  struct ggml_context **cctx;
+  ggml_backend_buffer_t *cbuf;
+  int n_const, cap_const;
   int state;
   int threads;
   double max_bytes, bytes_inputs, bytes_compute;
@@ -90,6 +94,7 @@ SEXP zlm_graph_output(SEXP gptr, SEXP index);
 SEXP zlm_noise(SEXP gptr, SEXP key, SEXP dist, SEXP offset, SEXP dims, SEXP call);
 SEXP zlm_rowloss_op(SEXP gptr, SEXP ha, SEXP hb, SEXP mode, SEXP scale, SEXP call);
 SEXP zlm_rowloss_get(SEXP rlptr);
+SEXP zlm_const(SEXP gptr, SEXP values, SEXP dims);
 SEXP zlm_graph_store_ptr(SEXP gptr);
 int zlm_graph_is_param(const zlm_graph *g, const struct ggml_tensor *t);
 

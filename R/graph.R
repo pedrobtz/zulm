@@ -165,7 +165,7 @@ zl_forward <- function(g, data, outputs = NULL) {
     rl <- g$outputs$rowloss[[which[[i]]]]
     if (!is.null(rl)) {
       # the fixed-order sum of the rows, the same at any thread count
-      vals[[i]] <- zlm_call("zlm_rowloss_get", rl)
+      vals[[i]] <- zlm_rowloss_sum(rl)
     }
   }
   for (i in seq_along(vals)) {
@@ -266,4 +266,12 @@ print.zl_graph <- function(x, ...) {
 zlm_threads <- function() {
   n <- getOption("zulm.threads", 1L)
   if (!is.numeric(n) || length(n) != 1L || is.na(n) || n < 1) 1L else as.integer(n)
+}
+
+# The reported value of a loss with per-row companions: their fixed-order
+# sums, added in order.
+zlm_rowloss_sum <- function(rl) {
+  total <- 0
+  for (r in rl) total <- total + zlm_call("zlm_rowloss_get", r)
+  total
 }

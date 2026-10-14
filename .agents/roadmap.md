@@ -25,7 +25,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | 3 | [Graphs, operations, forward and validation](#stage-3--graphs-operations-forward-and-validation) | [#5](https://github.com/pedrobtz/zulm/issues/5) | [#24](https://github.com/pedrobtz/zulm/pull/24) | 2026-10-14 |
 | 4 | [Autograd, trainer and optimisers](#stage-4--autograd-trainer-and-optimisers) | [#6](https://github.com/pedrobtz/zulm/issues/6) | [#25](https://github.com/pedrobtz/zulm/pull/25) | 2026-10-14 |
 | 5 | [zurand in graphs and per-row loss sums](#stage-5--zurand-in-graphs-and-per-row-loss-sums) | [#7](https://github.com/pedrobtz/zulm/issues/7) | [#26](https://github.com/pedrobtz/zulm/pull/26) | 2026-10-14 |
-| 6 | [Modules, the driving model and PyTorch fixtures](#stage-6--modules-the-driving-model-and-pytorch-fixtures) | [#8](https://github.com/pedrobtz/zulm/issues/8) | | |
+| 6 | [Modules, the driving model and PyTorch fixtures](#stage-6--modules-the-driving-model-and-pytorch-fixtures) | [#8](https://github.com/pedrobtz/zulm/issues/8) | [#27](https://github.com/pedrobtz/zulm/pull/27) | 2026-10-14 |
 | 7 | [Thread pool, interrupts, fork and determinism](#stage-7--thread-pool-interrupts-fork-and-determinism) | [#9](https://github.com/pedrobtz/zulm/issues/9) | | |
 | 8 | [safetensors and weight types](#stage-8--safetensors-and-weight-types) | [#10](https://github.com/pedrobtz/zulm/issues/10) | | |
 | 9 | [State tensors and the graph cache](#stage-9--state-tensors-and-the-graph-cache) | [#11](https://github.com/pedrobtz/zulm/issues/11) | | |
@@ -376,6 +376,14 @@ transformer block, AdaLN, the losses and the two §1.2 inference blocks.
 - Each module matches a hand-written R version.
 
 **Design.** §1.1, §1.2, §5.2, §11 (fixtures), §15 criteria 2, 3 and 9.
+
+**Deviations (2026-10-14).** The synthetic marked process first gave the
+model too little signal: the last 100 steps' mean loss was 67 % of the
+first 100's. Its kind means were tripled and its noise cut to 0.1, which
+gives 18 %; the criterion itself is unchanged. Constants and `repeat`
+were added to graphs, which the modules need (each constant has a
+buffer of its own). The acceptance test runs in an `acceptance`
+workflow, which sets `ZULM_ACCEPTANCE=true`.
 
 ## Stage 7 — Thread pool, interrupts, fork and determinism
 

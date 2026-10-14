@@ -76,3 +76,9 @@
 * Reported losses (`zl_cross_entropy()`, `zl_mse()`, `zl_mae()`, from
   `zl_step()` and `zl_forward()`) are fixed-order sums of per-row values,
   so they are the same at any thread count.
+
+* Modules: `zl_linear()`, `zl_embedding()`, `zl_norm()`,
+  `zl_attention()`, `zl_mlp()`, `zl_block()`, `zl_adaln()` and
+  `zl_time_embedding()` declare their parameters in a store and return
+  functions of tensors. They, the losses and two attention blocks in the
+  styles of TimesFM and Toto are checked against PyTorch.
