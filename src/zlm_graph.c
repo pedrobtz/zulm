@@ -294,7 +294,7 @@ SEXP zlm_tensor_info(SEXP h, SEXP gptr) {
 typedef struct {
   zlm_graph *g;
   const char *op;
-  struct ggml_tensor *a, *b, *c;
+  struct ggml_tensor *a, *b, *c, *d;
   double p[8];
   int ip[8];
   int64_t ne[4];
@@ -471,6 +471,25 @@ static void op_body(void *data) {
     r = ggml_pad(ctx, cont(ctx, a), j->ip[0], j->ip[1], j->ip[2], j->ip[3]);
   } else if (strcmp(op, "get_rows") == 0) {
     r = ggml_get_rows(ctx, cont(ctx, a), b);
+  } else if (strcmp(op, "flash_attn") == 0) {
+    /* a: q, b: k, c: v, d: the f32 mask, converted to the f16 the kernel
+       reads; the CPU kernel accumulates in f32 at the default precision */
+    struct ggml_tensor *q = cont(ctx, a);
+    struct ggml_tensor *m = j->d == NULL ? NULL : cont(ctx, j->d);
+    /* A single query takes the kernel's split-KV path, whose sums depend
+       on the thread count (design §6.5, §6.9). Two copies of it keep
+       every query on one thread, and the first copy is the result. */
+    int pad = q->ne[1] == 1;
+    if (pad) {
+      q = ggml_concat(ctx, q, q, 1);
+      if (m != NULL) m = ggml_concat(ctx, m, m, 1);
+    }
+    if (m != NULL) m = ggml_cast(ctx, m, GGML_TYPE_F16);
+    r = ggml_flash_attn_ext(ctx, q, cont(ctx, b), cont(ctx, j->c), m, (float) j->p[0], 0.0f, 0.0f);
+    if (pad) {
+      /* r is c(d_v, heads, 2, batch); keep the first query */
+      r = ggml_cont(ctx, ggml_view_4d(ctx, r, r->ne[0], r->ne[1], 1, r->ne[3], r->nb[1], r->nb[2], r->nb[3], 0));
+    }
   } else if (strcmp(op, "set_rows") == 0) {
     r = ggml_set_rows(ctx, a, cont(ctx, j->c), b);
   } else if (strcmp(op, "clamp") == 0) {
@@ -757,6 +776,43 @@ SEXP zlm_noise(SEXP gptr, SEXP key, SEXP dist, SEXP offset, SEXP dims, SEXP call
 }
 
 /* The per-row companion of a loss (design §7.1): list(handle, pointer). */
+/* zl_flash_attention(): q c(d, n, heads, batch), k c(d, n_kv, heads_kv,
+   batch), v c(d_v, n_kv, heads_kv, batch), an optional additive mask
+   c(n_kv, n) broadcast over heads and batch; f32 throughout. */
+SEXP zlm_flash_attn(SEXP gptr, SEXP hq, SEXP hk, SEXP hv, SEXP hm, SEXP scale, SEXP call) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  if (g->state != ZLM_GRAPH_BUILDING) {
+    zlm_raise("zulm_invalid_argument", R_NilValue, "Operations on tensors are used inside build() only.");
+  }
+  zlm_opjob j;
+  memset(&j, 0, sizeof j);
+  j.g = g;
+  j.op = "flash_attn";
+  j.a = tensor_from(hq, gptr);
+  j.b = tensor_from(hk, gptr);
+  j.c = tensor_from(hv, gptr);
+  j.d = Rf_isNull(hm) ? NULL : tensor_from(hm, gptr);
+  j.p[0] = Rf_asReal(scale);
+  const char *op = "zl_flash_attention()";
+  const struct ggml_tensor *q = j.a, *k = j.b, *v = j.c, *m = j.d;
+  need_f32(op, q);
+  need_f32(op, k);
+  need_f32(op, v);
+  need_f32(op, m);
+  if (k->ne[0] != q->ne[0])
+    shape_error(call, op, q, k, "q and k must have the same first dimension");
+  if (v->ne[1] != k->ne[1] || v->ne[2] != k->ne[2] || v->ne[3] != k->ne[3])
+    shape_error(call, op, k, v, "k and v must have the same second, third and fourth dimensions");
+  if (q->ne[2] % k->ne[2] != 0)
+    shape_error(call, op, q, k, "k's heads must divide q's");
+  if (q->ne[3] != k->ne[3])
+    shape_error(call, op, q, k, "q and k must have the same fourth dimension");
+  if (m != NULL && (m->ne[0] != k->ne[1] || m->ne[1] != q->ne[1] ||
+                    q->ne[2] % m->ne[2] != 0 || q->ne[3] % m->ne[3] != 0))
+    shape_error(call, op, q, m, "the mask must be c(n_kv, n), with heads and batch dividing q's");
+  return run_op(gptr, &j, call);
+}
+
 SEXP zlm_rowloss_op(SEXP gptr, SEXP ha, SEXP hb, SEXP mode, SEXP scale, SEXP call) {
   zlm_graph *g = zlm_graph_from(gptr);
   if (g->state != ZLM_GRAPH_BUILDING) {
