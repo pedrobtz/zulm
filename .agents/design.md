@@ -1363,7 +1363,11 @@ the last value (0 before any training). A noise node is a
 elements by position, so a draw is the same at any thread count and
 under any split of a batch with matching offsets. `zl_rng_uniform()`
 and `zl_rng_normal()` in R call the same C code, so the two agree bit
-for bit. At load, zulm reads zurand's table and refuses a version below
+for bit. **Changed in Stage 10:** a noise node is one task, run on
+the thread that called the computation. zurand's fills open an OpenMP
+region even when they run serially, and libgomp keeps state for every
+thread that opens one; ggml's pool threads leaked it on exit, which
+valgrind reported. Draws are positional, so the values are the same. At load, zulm reads zurand's table and refuses a version below
 3 with `zulm_companion_error`.
 
 The per-row losses of §7.1 are built by `zl_cross_entropy()`,

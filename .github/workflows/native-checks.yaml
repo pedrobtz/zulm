@@ -26,10 +26,10 @@ jobs:
   valgrind:
     uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
     with:
-      # The full suite under valgrind passed the default 60 minutes once
-      # state tensors and the decode tests came (Stage 9); nothing is
-      # skipped, the job only gets the time it needs.
-      timeout-minutes: 150
+      # The full suite under valgrind takes about two and a half hours
+      # since state tensors, the decode and flash-attention tests (Stages 9
+      # and 10); nothing is skipped, the job only gets the time it needs.
+      timeout-minutes: 300
       profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
 
   lto:
