@@ -1,0 +1,24 @@
+#!/bin/sh
+# Writes src/Makevars: src/Makevars.in plus the variant fragment for the
+# compiler's target architecture (design §13.1). With ZULM_CFLAGS or
+# ZULM_CXXFLAGS set, one variant named "native" is built instead (§13.4).
+: "${R_HOME:=$(R RHOME)}"
+CC=$("${R_HOME}/bin/R" CMD config CC)
+macros=$(echo | ${CC} -dM -E - 2>/dev/null)
+case $macros in
+  *__x86_64__*) arch=x86_64 ;;
+  *__aarch64__*) arch=arm64 ;;
+  *) arch=generic ;;
+esac
+if [ -n "${ZULM_CFLAGS}${ZULM_CXXFLAGS}" ]; then
+  case $arch in
+    x86_64) set=native_x86 ;;
+    arm64) set=native_arm ;;
+    *) set=native_generic ;;
+  esac
+  echo "zulm: native build with ZULM_CFLAGS='${ZULM_CFLAGS}' ZULM_CXXFLAGS='${ZULM_CXXFLAGS}'"
+else
+  set=$arch
+fi
+echo "zulm: building the ${set} variant set"
+cat src/Makevars.in "src/make/${set}.mk" > src/Makevars

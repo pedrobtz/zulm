@@ -1,0 +1,26 @@
+# zulm build: design §13.1, §13.4. configure writes src/Makevars from this
+# file and the fragment under make/ for the target architecture.
+#
+# R's check warns about any -f, -m, -O or -W token in a PKG_*FLAGS variable
+# and NOTEs non-portable flags in the install log, so there is none here:
+# ISA targets and unrolling are pragmas in zlm_variant_begin.h, and hidden
+# symbols come from Makeconf's visibility macros.
+CXX_STD = CXX17
+
+# -I. finds zulm's headers, -Iggml/... the vendored tree (design §9.1).
+# GGML_USE_CPU_REPACK and GGML_SCHED_MAX_COPIES as upstream's CMake sets
+# them; -pthread where ggml's thread pool needs it (WRE §1.2.1 allows it in
+# PKG_CPPFLAGS).
+PKG_CPPFLAGS = -I. -Iggml/include -Iggml/src -Iggml/src/ggml-cpu \
+  -DGGML_USE_CPU_REPACK -DGGML_SCHED_MAX_COPIES=4 -pthread
+
+# ZULM_CFLAGS and ZULM_CXXFLAGS are the opt-in native-build hooks: make
+# reads them from the environment, and they are empty unless the user sets
+# them, so CRAN builds and R CMD check see only the visibility macros.
+
+PKG_CFLAGS = $(C_VISIBILITY) $(ZULM_CFLAGS)
+PKG_CXXFLAGS = $(CXX_VISIBILITY) $(ZULM_CXXFLAGS)
+PKG_LIBS = -pthread
+
+# The registered DLL is the probe alone; the variants are linked below.
+OBJECTS = zulm.o
