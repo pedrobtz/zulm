@@ -37,7 +37,9 @@ zulm_info <- function() {
       variants_installed = .zlm$installed,
       native_cflags = hooks$ZULM_CFLAGS,
       native_cxxflags = hooks$ZULM_CXXFLAGS,
-      compiler = native$compiler
+      compiler = native$compiler,
+      rng_key = format(zlm_session_key()),
+      zurand_table_version = .zlm$zurand_version
     ),
     list(cpu = native[setdiff(
       names(native),

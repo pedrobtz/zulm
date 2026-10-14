@@ -10,6 +10,8 @@
 
 .onLoad <- function(libname, pkgname) {
   zlm_load_variant(getOption("zulm.variant"))
+  .zlm$zurand_version <- zlm_call("zlm_zurand_init")
+  zlm_check_zurand(.zlm$zurand_version)
 }
 
 .onUnload <- function(libpath) {

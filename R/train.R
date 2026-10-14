@@ -177,6 +177,11 @@ zl_step <- function(tr, data, lr = NULL) {
   }
   zlm_write_inputs(tr$graph, data)
   loss <- zlm_call("zlm_trainer_step", tr$ptr, as.double(lr))
+  rl <- tr$graph$outputs$rowloss[[match(tr$graph$loss, tr$graph$outputs$names)]]
+  if (!is.null(rl)) {
+    # the fixed-order sum of per-row values (design §7.1)
+    loss <- zlm_call("zlm_rowloss_get", rl)
+  }
   if (!is.finite(loss)) {
     zlm_warn(sprintf("The loss is %s.", format(loss)), "zulm_nonfinite_warning")
   }
