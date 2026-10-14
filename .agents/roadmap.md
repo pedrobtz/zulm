@@ -21,7 +21,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | --- | --- | --- | --- | --- |
 | 0 | [Package identity](#stage-0--package-identity) | [#2](https://github.com/pedrobtz/zulm/issues/2) | [#19](https://github.com/pedrobtz/zulm/pull/19) | 2026-10-14 |
 | 1 | [Vendored ggml and the CPU-dispatch go/no-go](#stage-1--vendored-ggml-and-the-cpu-dispatch-gono-go) | [#3](https://github.com/pedrobtz/zulm/issues/3) | [#21](https://github.com/pedrobtz/zulm/pull/21) | 2026-10-14 |
-| 2 | [Tensors, types, store and GGUF](#stage-2--tensors-types-store-and-gguf) | [#4](https://github.com/pedrobtz/zulm/issues/4) | | |
+| 2 | [Tensors, types, store and GGUF](#stage-2--tensors-types-store-and-gguf) | [#4](https://github.com/pedrobtz/zulm/issues/4) | | 2026-10-14 |
 | 3 | [Graphs, operations, forward and validation](#stage-3--graphs-operations-forward-and-validation) | [#5](https://github.com/pedrobtz/zulm/issues/5) | | |
 | 4 | [Autograd, trainer and optimisers](#stage-4--autograd-trainer-and-optimisers) | [#6](https://github.com/pedrobtz/zulm/issues/6) | | |
 | 5 | [zurand in graphs and per-row loss sums](#stage-5--zurand-in-graphs-and-per-row-loss-sums) | [#7](https://github.com/pedrobtz/zulm/issues/7) | | |
@@ -193,6 +193,13 @@ persists as GGUF.
   counts.
 
 **Design.** §5.1 (store and persistence), §6.1, §6.6, §10; D13, D22.
+
+**Deviations (2026-10-14).** A store is a list of allocation batches,
+each with its own buffer, rather than one buffer (design §4, §6.6
+revised): tensors then never move, so a graph built on a store stays
+valid when parameters are added. Stores survive `fork()`; only objects
+that own threads (Stage 7) become stale in a child. `zl_load()` widens
+every tensor to f32 here; Stage 8 adds keeping f16 and bf16.
 
 ## Stage 3 — Graphs, operations, forward and validation
 
