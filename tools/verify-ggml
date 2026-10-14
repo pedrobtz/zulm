@@ -1,0 +1,27 @@
+#!/bin/sh
+# Offline check of src/ggml/ (design §9.1, §9.2): every file listed in
+# src/ggml/VERSION has its recorded SHA-256, no file is unlisted, and no
+# diagnostic pragma is present. tools/vendor-ggml --verify is the online
+# check that the tree is upstream's tag plus exactly the recorded patches.
+set -eu
+here=$(cd "$(dirname "$0")/.." && pwd)
+cd "$here/src/ggml"
+fail=0
+sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi; }
+listed=$(mktemp)
+trap 'rm -f "$listed"' EXIT
+sed -n '/^files:$/,$p' VERSION | sed 1d > "$listed"
+while read -r sum file; do
+  [ -f "$file" ] || { echo "FAIL missing: $file"; fail=1; continue; }
+  got=$(sha "$file" | cut -d' ' -f1)
+  [ "$got" = "$sum" ] || { echo "FAIL checksum: $file"; fail=1; }
+done < "$listed"
+find . -type f ! -name VERSION | sed 's#^\./##' | LC_ALL=C sort | while read -r f; do
+  grep -q "  $f\$" "$listed" || { echo "FAIL unlisted: $f"; exit 1; }
+done || fail=1
+if grep -rnE '^[[:space:]]*#[[:space:]]*pragma[[:space:]]+(GCC|clang)[[:space:]]+diagnostic' . ; then
+  echo "FAIL diagnostic pragma under src/ggml (design §9.2)"
+  fail=1
+fi
+[ "$fail" -eq 0 ] && echo "ok  src/ggml/ matches src/ggml/VERSION and has no diagnostic pragma"
+exit "$fail"

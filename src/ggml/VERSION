@@ -1,0 +1,77 @@
+# ggml vendored by tools/vendor-ggml; do not edit by hand.
+repository: https://github.com/ggml-org/ggml
+tag: v0.26.0
+commit: d7cb574130e6f01ad25b3289685489200febcd74
+patch: (none)
+stripped: src/ggml-cpu/amx/mmq.cpp:2:#pragma GCC diagnostic ignored "-Wpedantic"
+stripped: src/ggml-cpu/amx/mmq.cpp:3:#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+stripped: src/ggml-cpu/arch/arm/repack.cpp:22:#pragma GCC diagnostic ignored "-Woverlength-strings"
+stripped: src/ggml-cpu/arch/x86/repack.cpp:22:#pragma GCC diagnostic ignored "-Woverlength-strings"
+stripped: src/ggml-cpu/llamafile/sgemm.cpp:47:#pragma GCC diagnostic ignored "-Wpedantic"
+stripped: src/ggml-cpu/llamafile/sgemm.cpp:48:#pragma GCC diagnostic ignored "-Wignored-attributes"
+stripped: src/ggml-cpu/repack.cpp:22:#pragma GCC diagnostic ignored "-Woverlength-strings"
+stripped: src/ggml-cpu/simd-gemm.h:244:#pragma GCC diagnostic pop
+files:
+94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d  LICENSE
+d114067f9099c4a0e2bbc0625c676d4894d9cf0ea27168ee072c7de0e71bb51d  include/ggml-alloc.h
+5791edae1fb7622027621d15bc7a160198bd3b75ed8f96d06cb7b85e2b873756  include/ggml-backend.h
+bc15ba002c68685df23faae42df0d2b3d58032011f88b649021ab92485862c72  include/ggml-cpp.h
+316279e004cdeb8e6ef78599acb602bf79a8abdf897fed9fd1914808c1518c6e  include/ggml-cpu.h
+3586de1bc8a934b5c72339e2b6937b0641e8f149b512231e666f67de0736eea2  include/ggml-opt.h
+12ee71f99db7db9b353bc02b1fbb57c344ee17c01ac5fb7952b41a637a747ea9  include/ggml.h
+e56714aab702e5ce62ee587a409643c08f7e93e8fbb77f48ef7cc85075f96fa4  include/gguf.h
+9664bda3e9c4223f5c94ebfeb3c0381f0065a5091ddae707c09a800f7e419a39  src/ggml-alloc.c
+4e861c8e23d3d7b0d99d8e0836e68564af58f8597d75d7bbb732857d7a632fa7  src/ggml-backend-impl.h
+f459c44d86a19a7c7be01663f2bcaf64f6b9dc486f28b10e8eba13328c82299f  src/ggml-backend-meta.cpp
+cdb79f2937aa147084a76f949adc0eb760ad1883e0ccc015bb4e0f599c89bd5f  src/ggml-backend.cpp
+0061131b615c5721fc88a78feeb22c1f8c450f1c2646a317d80796a653bf595c  src/ggml-common.h
+0d1641ce16917e3f6260ff74523b158bb823599bbf76cbf9aedcc9d365de84d4  src/ggml-cpu/amx/amx.cpp
+9d098ceee6a8114d4a660ff269064a27aa25b8a4f205d1e6984d17bec5104f0d  src/ggml-cpu/amx/amx.h
+c694f6bb066a820b717f986914b0d112dca0d8d3a1e239e958fce30c864751c3  src/ggml-cpu/amx/common.h
+8f977655b046bebfebebe9d8df061a9b219819d05ad3bb94c78d2a5a58f674ad  src/ggml-cpu/amx/mmq.cpp
+bd33d0713b12daf9eedea1619dd715619baaa36b98c44ec754d532909d80933a  src/ggml-cpu/amx/mmq.h
+021e6efbd5b67194b291303b42e847a6426296e1f244b88cf8f0ab2003c5e271  src/ggml-cpu/arch-fallback.h
+a8691f7fb8f41f707d68566a168196b5ff7743090b0b486a0be998df6476c511  src/ggml-cpu/arch/arm/cpu-feats.cpp
+a4d3cfdea82b73c0086f63ad9f698e536117a1c25f2f266fc9cd6e7f51deab1b  src/ggml-cpu/arch/arm/quants.c
+c5977083b57b0280806f3bf83e6efc2109afb1d718c173428c3cfec0f68f8449  src/ggml-cpu/arch/arm/repack.cpp
+b0f6aaaeb0b12a4f3e15ceec14d0c2031633f91e864a6c15954a001d6390f6d4  src/ggml-cpu/arch/x86/cpu-feats.cpp
+3c489fdc77e3ab484a5f188bff9c60c0e9483c951ed65c1a562a04c249d5628e  src/ggml-cpu/arch/x86/quants.c
+f06a23e8e2886c1156970d70235ac4ef1e85729b07752030491ed2bdac1bfcff  src/ggml-cpu/arch/x86/repack.cpp
+2df261aadce36a20f5e3bf6961d4ca27b8c2d461afc41488361ee6ad09c1730d  src/ggml-cpu/binary-ops.cpp
+5915519c4e2227db28239b2a5d3b8a5f9022730cc0ddb7880b24748ee78cd1f9  src/ggml-cpu/binary-ops.h
+db7c19747a28c819d18922aa43b91b224df3730e424e6d8a4cf4fd16bfb1db14  src/ggml-cpu/common.h
+785a19aac84bd35671d34b1986b920baadccdf61cd8b81e787028f6ac24cae60  src/ggml-cpu/ggml-cpu-impl.h
+45b22f8c83b2cbccabfc2f81a38ef8a5810223e1ce366b7c6f77d42faa5cc6f3  src/ggml-cpu/ggml-cpu.c
+ccf382d3fbf126b5ddb5850a0a970656fb24e00587da4003419439277c91cd01  src/ggml-cpu/ggml-cpu.cpp
+e5cf5c8327f99ccb58461d8416e27bc38da01d9bd450e48f3df69bd34a81a47c  src/ggml-cpu/hbm.cpp
+340c84ac6a1c83d2218a15d6d71c1efb6ba1a5517162c2fde4baa0a9204af26b  src/ggml-cpu/hbm.h
+af3cf0ad026244e808afb8be7f80e3aa04b64a627d157fa22013c28e7bc9f0ab  src/ggml-cpu/llamafile/sgemm.cpp
+6ec12aa9244a8ffb13ae56b2e391f905b1d152ae25ff45da6a66e18daf650b3b  src/ggml-cpu/llamafile/sgemm.h
+215d16e7ebbb4066920e2d7a5f7ea6c46636d298aedd553e00f0b3ebb0d59305  src/ggml-cpu/ops.cpp
+2727d0414c23f1d06ade33d277c3ca1f0726c7902642c0e36d839c20781b1694  src/ggml-cpu/ops.h
+a61f1011e49d05b5f99d352b158d5b8e36cf008294bb0db309f72bdd7f1d4e35  src/ggml-cpu/quants.c
+918d6755b3e601ec7bb83c7dbf1d73304490651ccbb4072b0d31a2b45df751da  src/ggml-cpu/quants.h
+82e81521da82f89d7d4f4602cde3590368c3815bf7ba7cad5686ecb81e3aa977  src/ggml-cpu/repack.cpp
+d392cb13586c8c9177f6a0f75a75936882d09b9a70e6d989cedb3dd79f3c752a  src/ggml-cpu/repack.h
+9f58880464f8c31299649eed456819b1d01650e8b0d481de03ffdb16742df333  src/ggml-cpu/simd-gemm.h
+a936298928e4dcfc1b61fb9e99cf8a152572b413e30f38dc8e7c3211ee9cb6a0  src/ggml-cpu/simd-mappings.h
+8f81a18b9a210fac732ecac020b048184edfe2c5e74a5cc95c4df89e60bc8f13  src/ggml-cpu/tiled/tiled-kernel.cpp
+0d729f5a6b4cd1584bd181fbc882e39f64fd41bf66ac1a9c009025d2b09ff23e  src/ggml-cpu/tiled/tiled-kernel.h
+a5d92ce8f617696778e225de6658180649143fec3792c5cfef84170641f2d06e  src/ggml-cpu/tiled/tiled.cpp
+684aaa5320e20eadfc799c8ce04c52bf7c0d32b323f395de59ce469bda254a72  src/ggml-cpu/tiled/tiled.h
+a85bd3ff50c91cb67d14221988544664dfe5975db0811b330dc4a2f385239de4  src/ggml-cpu/traits.cpp
+26e1b41879091a663325848aa82a4023b459fd1e688b3b0e2a9bde3e72a3a764  src/ggml-cpu/traits.h
+e63b382766f1b8c5ded1577be9704e85cb4e9cd24584f3e1474911a40146df33  src/ggml-cpu/unary-ops.cpp
+280b7979055079d43bdde7790a7290bf04f75640481c59abc2364c46d6ac6d8e  src/ggml-cpu/unary-ops.h
+31e43ec66a1e2920a549dd2f71e6ce474e68f2fc298c4d2942404ca327e763d1  src/ggml-cpu/vec.cpp
+885a50e405f20f75ea70cb7fb062934812beffc9229ddb56a003aa150163d2fa  src/ggml-cpu/vec.h
+4490179fd8c6df80fe29fc602ed7236eb828c51e9c379efb0dd510cb5cb81fec  src/ggml-feats.h
+43564db0238aebb7ed68501e346c194866b5dac218d1d37b26baff9f458c00d3  src/ggml-impl.h
+e35fd27856e37f3611d3bc6f17ee963be51bfe92bec96fad0a9fa2c7ebbe9c46  src/ggml-opt.cpp
+5574a2dccf7c07e75b143733e04a5412d3d8c819e7945f5217a7b83a2b2ff8ab  src/ggml-quants.c
+28ae5fca1f3be636b36cd6c4fa2ca74fd42d229bfbd5352eaf66f3727bb8a6da  src/ggml-quants.h
+13a18d885393722b7c9f42d4cf8575a4d41699926d656f78a867fa4fac9dad20  src/ggml-threading.cpp
+9652729043ed91482392c1aa08af5d813190d0ace2e7982d2539d28240ab8d8b  src/ggml-threading.h
+e54f304d0e38bc50d51ab162589b1705568aae5252504dbabc867c4c70129252  src/ggml-version.h
+7e8bf2b60598b50d718f46aa3c36c9293b10f4e7dfde6844f0693e6fc976d505  src/ggml.c
+7505d6a434dc740941a682fd3b476ef9bd9893ab76adf18c9969daa528bd5be5  src/gguf.cpp

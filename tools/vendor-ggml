@@ -1,0 +1,128 @@
+#!/bin/sh
+# Vendor upstream ggml's CPU subset into src/ggml/ (design §9.1, §9.2).
+#
+#   tools/vendor-ggml [TAG]          # default: the pinned tag below
+#   tools/vendor-ggml --verify       # re-vendor into a temporary directory
+#                                    # and fail unless it equals src/ggml/
+#
+# Steps: shallow-clone the tag, copy the file list of design §9.1, delete
+# the diagnostic pragmas R's check reports (§9.2), apply tools/patches/*.patch
+# in order, write src/ggml/src/ggml-version.h, and record tag, commit,
+# patches, stripped pragmas and each file's SHA-256 in src/ggml/VERSION.
+# Patch drafts under tools/patches/drafts/ are not applied.
+set -eu
+
+TAG_DEFAULT=v0.26.0
+REPO=https://github.com/ggml-org/ggml
+
+here=$(cd "$(dirname "$0")/.." && pwd)
+verify=0
+tag=$TAG_DEFAULT
+case "${1:-}" in
+  --verify) verify=1 ;;
+  "") ;;
+  *) tag=$1 ;;
+esac
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT INT TERM
+
+git -c advice.detachedHead=false clone -q --depth 1 --branch "$tag" "$REPO" "$work/up"
+commit=$(git -C "$work/up" rev-parse HEAD)
+up=$work/up
+
+out=$work/ggml
+mkdir -p "$out/include" "$out/src"
+
+for f in ggml.h ggml-alloc.h ggml-backend.h ggml-cpu.h ggml-opt.h gguf.h ggml-cpp.h; do
+  cp "$up/include/$f" "$out/include/$f"
+done
+
+for f in ggml.c ggml-alloc.c ggml-quants.c ggml-quants.h ggml-backend.cpp \
+         ggml-backend-meta.cpp ggml-threading.cpp ggml-threading.h ggml-opt.cpp \
+         gguf.cpp ggml-impl.h ggml-common.h ggml-backend-impl.h ggml-feats.h; do
+  cp "$up/src/$f" "$out/src/$f"
+done
+
+# ggml-cpu/ without kleidiai, spacemit, the build files and the arch/
+# directories other than x86 and arm.
+(
+  cd "$up/src"
+  find ggml-cpu \
+    \( -path 'ggml-cpu/kleidiai' -o -path 'ggml-cpu/spacemit' -o -path 'ggml-cpu/cmake' \
+       -o -path 'ggml-cpu/arch/powerpc' -o -path 'ggml-cpu/arch/s390' \
+       -o -path 'ggml-cpu/arch/riscv' -o -path 'ggml-cpu/arch/loongarch' \
+       -o -path 'ggml-cpu/arch/wasm' \) -prune \
+    -o -type f \( -name '*.c' -o -name '*.cpp' -o -name '*.h' \) -print
+) | LC_ALL=C sort | while read -r f; do
+  mkdir -p "$out/src/$(dirname "$f")"
+  cp "$up/src/$f" "$out/src/$f"
+done
+
+cp "$up/LICENSE" "$out/LICENSE"
+
+# §9.2: R CMD check --as-cran reports every '#pragma GCC|clang diagnostic'
+# that ignores a warning, compiled or not. Delete all diagnostic pragmas
+# (ignored, push and pop) and record each deletion.
+stripped=$work/stripped
+: > "$stripped"
+(cd "$out" && grep -rnE '^[[:space:]]*#[[:space:]]*pragma[[:space:]]+(GCC|clang)[[:space:]]+diagnostic' . || true) |
+  LC_ALL=C sort > "$stripped"
+cut -d: -f1 "$stripped" | sort -u | while read -r f; do
+  sed -E '/^[[:space:]]*#[[:space:]]*pragma[[:space:]]+(GCC|clang)[[:space:]]+diagnostic/d' \
+    "$out/$f" > "$out/$f.tmp"
+  mv "$out/$f.tmp" "$out/$f"
+done
+
+patches=$(cd "$here/tools/patches" 2>/dev/null && ls *.patch 2>/dev/null | LC_ALL=C sort || true)
+for p in $patches; do
+  patch -s -p1 -d "$out" < "$here/tools/patches/$p"
+done
+
+version=${tag#v}
+patch_list=$(echo $patches | tr ' ' ',')
+cat > "$out/src/ggml-version.h" <<EOH
+#pragma once
+
+/* Written by tools/vendor-ggml; replaces upstream's ggml-version.h.in. */
+#define GGML_VERSION "$version"
+#define GGML_COMMIT  "${commit}"
+/* The tools/patches/ files applied, comma-separated (design §9.3). */
+#define ZULM_GGML_PATCHES "${patch_list}"
+EOH
+
+{
+  echo "# ggml vendored by tools/vendor-ggml; do not edit by hand."
+  echo "repository: $REPO"
+  echo "tag: $tag"
+  echo "commit: $commit"
+  if [ -n "$patches" ]; then
+    for p in $patches; do echo "patch: $p"; done
+  else
+    echo "patch: (none)"
+  fi
+  sed 's#^\./#stripped: #' "$stripped"
+  echo "files:"
+  (cd "$out" && find . -type f ! -name VERSION | sed 's#^\./##' | LC_ALL=C sort |
+     while read -r f; do
+       if command -v sha256sum >/dev/null 2>&1; then
+         sha256sum "$f"
+       else
+         shasum -a 256 "$f"
+       fi
+     done)
+} > "$out/VERSION"
+
+if [ "$verify" -eq 1 ]; then
+  if diff -r "$out" "$here/src/ggml" > "$work/diff"; then
+    echo "ok  src/ggml/ is $tag ($commit) plus the recorded patches"
+  else
+    echo "FAIL src/ggml/ differs from a fresh vendoring of $tag:"
+    head -50 "$work/diff"
+    exit 1
+  fi
+else
+  rm -rf "$here/src/ggml"
+  cp -R "$out" "$here/src/ggml"
+  echo "vendored ggml $tag ($commit) into src/ggml/"
+fi
