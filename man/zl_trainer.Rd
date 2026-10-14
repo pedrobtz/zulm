@@ -29,14 +29,15 @@ at an update.}
 \item{tr}{A trainer.}
 
 \item{data}{A named list of arrays for the graph's inputs, as for
-\code{\link[=zl_forward]{zl_forward()}}.}
+\code{\link[=zl_forward]{zl_forward()}}, or an iterator from \code{\link[=zl_arrow_batches]{zl_arrow_batches()}}.}
 
 \item{lr}{The learning rate of this step; \code{NULL} for the optimiser's.}
 
 \item{name}{A parameter's name.}
 }
 \value{
-\code{zl_trainer()} returns a trainer; \code{zl_step()} the loss, a number;
+\code{zl_trainer()} returns a trainer; \code{zl_step()} the loss, a number
+(\code{NULL} when \code{data} is an iterator whose stream has ended);
 \code{zl_grad()} an array of the parameter's dimensions; \code{zl_reset()} the
 trainer, invisibly.
 }
