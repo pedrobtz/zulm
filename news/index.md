@@ -171,3 +171,9 @@
   declare their parameters in a store and return functions of tensors.
   They, the losses and two attention blocks in the styles of TimesFM and
   Toto are checked against PyTorch.
+
+- [`zl_threads()`](https://pedrobtz.github.io/zulm/reference/zl_threads.md)
+  sets the number of threads for the session, capped at the available
+  cores and at 2 while `R CMD check` limits cores. One persistent pool
+  serves every computation, and is recreated in a forked process. A
+  computation can be interrupted; it then signals `zulm_interrupt`.

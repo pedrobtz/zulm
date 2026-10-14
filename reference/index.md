@@ -89,6 +89,8 @@
   Save and load parameters as GGUF
 - [`zl_seed()`](https://pedrobtz.github.io/zulm/reference/zl_seed.md) :
   The session's random-number key
+- [`zl_threads()`](https://pedrobtz.github.io/zulm/reference/zl_threads.md)
+  : Threads
 - [`zl_trainer()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
   [`zl_step()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
   [`zl_grad()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
