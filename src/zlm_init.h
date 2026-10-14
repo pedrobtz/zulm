@@ -15,6 +15,7 @@
 #include "zlm_store.h"
 #include "zlm_graph.h"
 #include "zlm_train.h"
+#include "zlm_rng.h"
 
 SEXP zlm_native_info(void);
 SEXP zlm_log_drain(void);
@@ -64,6 +65,12 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_trainer_reset", (DL_FUNC) &zlm_trainer_reset, 1},
   {"zlm_trainer_evals", (DL_FUNC) &zlm_trainer_evals, 1},
   {"zlm_trainer_free_", (DL_FUNC) &zlm_trainer_free_, 1},
+  {"zlm_zurand_init", (DL_FUNC) &zlm_zurand_init, 0},
+  {"zlm_zurand_version_ok", (DL_FUNC) &zlm_zurand_version_ok, 1},
+  {"zlm_rng_draw", (DL_FUNC) &zlm_rng_draw, 5},
+  {"zlm_noise", (DL_FUNC) &zlm_noise, 6},
+  {"zlm_rowloss_op", (DL_FUNC) &zlm_rowloss_op, 6},
+  {"zlm_rowloss_get", (DL_FUNC) &zlm_rowloss_get, 1},
   {NULL, NULL, 0}
 };
 

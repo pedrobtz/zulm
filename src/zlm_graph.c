@@ -30,6 +30,7 @@
 #include "zlm_glue.h"
 #include "zlm_graph.h"
 #include "zlm_r.h"
+#include "zlm_rng.h"
 #include "zlm_store.h"
 
 /* build contexts: the first holds this many tensors, each next one twice
@@ -69,6 +70,8 @@ static void graph_free(zlm_graph *g) {
   free(g->checks);
   free(g->node_t);
   free(g->node_c);
+  for (int i = 0; i < g->n_aux; i++) free(g->aux[i]);
+  free(g->aux);
   free(g);
 }
 
@@ -283,6 +286,8 @@ typedef struct {
   struct ggml_tensor *a, *b, *c;
   double p[8];
   int ip[8];
+  int64_t ne[4];
+  void *ud;
   struct ggml_tensor *out;
 } zlm_opjob;
 
@@ -376,6 +381,12 @@ static void op_body(void *data) {
        FILL has none); an infinite x gives NaN rather than 0 */
     struct ggml_tensor *x = cont(ctx, a);
     r = ggml_div(ctx, ggml_scale_bias(ctx, x, 0.0f, (float) j->p[0]), x);
+  } else if (strcmp(op, "noise") == 0) {
+    r = zlm_noise_node(ctx, (zlm_noise_t *) j->ud, j->ne);
+  } else if (strcmp(op, "rowloss") == 0) {
+    r = zlm_rowloss_node(ctx, (zlm_rowloss *) j->ud, cont(ctx, a), cont(ctx, b));
+  } else if (strcmp(op, "step") == 0) {
+    r = ggml_step(ctx, cont(ctx, a));
   } else if (strcmp(op, "mean") == 0) {
     /* only through "unchecked:", for the patch P1 regression test */
     r = ggml_mean(ctx, a);
@@ -621,6 +632,94 @@ SEXP zlm_op(SEXP gptr, SEXP op, SEXP ha, SEXP hb, SEXP num, SEXP ints, SEXP call
     g->n_checks++;
   }
   return tensor_wrap(gptr, j.out);
+}
+
+/* Memory a custom operation points to, owned by the graph. */
+static void *graph_aux(zlm_graph *g, size_t bytes) {
+  if (g->n_aux == g->cap_aux) {
+    int cap = g->cap_aux ? 2 * g->cap_aux : 8;
+    void **a = (void **) realloc(g->aux, (size_t) cap * sizeof *a);
+    if (a == NULL) return NULL;
+    g->aux = a;
+    g->cap_aux = cap;
+  }
+  void *p = calloc(1, bytes);
+  if (p != NULL) g->aux[g->n_aux++] = p;
+  return p;
+}
+
+static SEXP run_op(SEXP gptr, zlm_opjob *j, SEXP call) {
+  char msg[2048] = "";
+  int status = zlm_guarded(op_body, j, msg, sizeof msg);
+  if (status != ZLM_STATUS_OK || j->out == NULL) {
+    j->g->state = ZLM_GRAPH_FAILED;
+    zlm_raise(status == ZLM_STATUS_ENGINE ? "zulm_engine_error" : "zulm_internal_error", R_NilValue,
+              "Building %s failed: %s", j->op, msg[0] ? msg : "unknown operation");
+  }
+  record_call(j->g, gptr, call);
+  return tensor_wrap(gptr, j->out);
+}
+
+/* zl_noise_normal() and zl_noise_uniform(): a forward-only node of draws
+   from the stream `key` (already folded with the stream's name). */
+SEXP zlm_noise(SEXP gptr, SEXP key, SEXP dist, SEXP offset, SEXP dims, SEXP call) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  if (g->state != ZLM_GRAPH_BUILDING) {
+    zlm_raise("zulm_invalid_argument", R_NilValue, "Noise is drawn inside build() only.");
+  }
+  zurand_key k = zlm_key_from_r(key);
+  zlm_noise_t *nz = (zlm_noise_t *) graph_aux(g, sizeof *nz);
+  if (nz == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+  nz->key = k;
+  nz->dist = Rf_asInteger(dist);
+  nz->offset = (uint64_t) Rf_asReal(offset);
+  nz->step = &g->step;
+  zlm_opjob j;
+  memset(&j, 0, sizeof j);
+  j.g = g;
+  j.op = "noise";
+  j.ud = nz;
+  for (int k2 = 0; k2 < 4; k2++) j.ne[k2] = (int64_t) REAL(dims)[k2];
+  return run_op(gptr, &j, call);
+}
+
+/* The per-row companion of a loss (design §7.1): list(handle, pointer). */
+SEXP zlm_rowloss_op(SEXP gptr, SEXP ha, SEXP hb, SEXP mode, SEXP scale, SEXP call) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  if (g->state != ZLM_GRAPH_BUILDING) {
+    zlm_raise("zulm_invalid_argument", R_NilValue, "Losses are built inside build() only.");
+  }
+  zlm_opjob j;
+  memset(&j, 0, sizeof j);
+  j.g = g;
+  j.op = "rowloss";
+  j.a = tensor_from(ha, gptr);
+  j.b = tensor_from(hb, gptr);
+  int64_t nrows = ggml_nrows(j.a);
+  zlm_rowloss *rl = (zlm_rowloss *) graph_aux(g, sizeof *rl);
+  double *rows = (double *) graph_aux(g, (size_t) (nrows > 0 ? nrows : 1) * sizeof(double));
+  if (rl == NULL || rows == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+  rl->mode = Rf_asInteger(mode);
+  rl->scale = Rf_asReal(scale);
+  rl->n_rows = nrows;
+  rl->rows = rows;
+  j.ud = rl;
+  SEXP h = PROTECT(run_op(gptr, &j, call));
+  SEXP out = PROTECT(Rf_allocVector(VECSXP, 2));
+  SET_VECTOR_ELT(out, 0, h);
+  SET_VECTOR_ELT(out, 1, R_MakeExternalPtr(rl, R_NilValue, gptr));
+  UNPROTECT(2);
+  return out;
+}
+
+/* The reported loss: the fixed-order sum of the last run's rows. */
+SEXP zlm_rowloss_get(SEXP rlptr) {
+  zlm_rowloss *rl = (zlm_rowloss *) R_ExternalPtrAddr(rlptr);
+  SEXP gptr = R_ExternalPtrProtected(rlptr);
+  if (rl == NULL || TYPEOF(gptr) != EXTPTRSXP || R_ExternalPtrAddr(gptr) == NULL) {
+    zlm_raise("zulm_stale_error", R_NilValue, "This graph is no longer valid.");
+  }
+  return Rf_ScalarReal(zlm_rowloss_value(rl));
 }
 
 /* ---- finishing and running ------------------------------------------ */

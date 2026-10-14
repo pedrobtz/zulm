@@ -82,7 +82,8 @@ zl_graph <- function(build, p, inputs, loss = NULL, outputs = NULL) {
       outputs = list(
         names = names(res),
         ranks = vapply(res, function(t) t$rank, integer(1)),
-        handles = final
+        handles = final,
+        rowloss = lapply(res, function(t) t$rowloss)
       ),
       loss = loss
     ),
@@ -160,6 +161,13 @@ zl_forward <- function(g, data, outputs = NULL) {
   which <- zlm_output_index(g, outputs)
   vals <- zlm_call("zlm_graph_compute", g$ptr, which - 1L)
   names(vals) <- g$outputs$names[which]
+  for (i in seq_along(vals)) {
+    rl <- g$outputs$rowloss[[which[[i]]]]
+    if (!is.null(rl)) {
+      # the fixed-order sum of the rows, the same at any thread count
+      vals[[i]] <- zlm_call("zlm_rowloss_get", rl)
+    }
+  }
   for (i in seq_along(vals)) {
     r <- g$outputs$ranks[[which[[i]]]]
     if (r > 1L) {

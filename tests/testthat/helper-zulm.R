@@ -106,3 +106,14 @@ softmax_cols <- function(x) {
   e <- exp(sweep(m, 2, apply(m, 2, max)))
   array(sweep(e, 2, colSums(e), "/"), dim(x))
 }
+
+# Rounds positive doubles to f32 towards zero, zulm's rule for uniforms.
+f32_toward_zero <- function(x) {
+  r <- f32(x)
+  up <- r > x
+  if (any(up)) {
+    bits <- readBin(writeBin(r[up], raw(), size = 4), "integer", size = 4, n = sum(up))
+    r[up] <- readBin(writeBin(bits - 1L, raw(), size = 4), "double", size = 4, n = sum(up))
+  }
+  r
+}

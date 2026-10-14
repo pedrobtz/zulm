@@ -546,23 +546,48 @@ NULL
 #' @rdname zl-loss
 #' @export
 zl_cross_entropy <- function(logits, prob) {
+  call <- sys.call()
   a <- zlm_as_tensor(logits, "logits")
   b <- zlm_as_tensor(prob, "prob")
-  zlm_op("cross_entropy", a, b, rank = 1L, call = sys.call())
+  loss <- zlm_op("cross_entropy", a, b, rank = 1L, call = call)
+  zlm_with_rows(loss, a, b, 0L, 1 / (prod(dim(a)) / dim(a)[[1L]]), call)
 }
 
 #' @rdname zl-loss
 #' @export
 zl_mse <- function(pred, target) {
-  d <- zlm_as_tensor(pred, "pred") - zlm_as_tensor(target, "target")
-  zl_scale(zl_sum(zl_sqr(d)), 1 / prod(dim(d)))
+  a <- zlm_as_tensor(pred, "pred")
+  b <- zlm_as_tensor(target, "target")
+  d <- a - b
+  loss <- zl_scale(zl_sum(zl_sqr(d)), 1 / prod(dim(d)))
+  zlm_with_rows(loss, a, b, 1L, 1 / prod(dim(d)), sys.call())
 }
 
 #' @rdname zl-loss
 #' @export
 zl_mae <- function(pred, target) {
-  d <- zlm_as_tensor(pred, "pred") - zlm_as_tensor(target, "target")
-  zl_scale(zl_sum(zl_abs(d)), 1 / prod(dim(d)))
+  a <- zlm_as_tensor(pred, "pred")
+  b <- zlm_as_tensor(target, "target")
+  d <- a - b
+  loss <- zl_scale(zl_sum(zl_abs(d)), 1 / prod(dim(d)))
+  zlm_with_rows(loss, a, b, 2L, 1 / prod(dim(d)), sys.call())
+}
+
+# The reported value of a loss is a fixed-order sum of per-row values
+# (design §7.1): a per-row node feeds the loss through
+# 0 * sum(step(rows)), which adds exactly 0 and, because ggml never
+# differentiates step()'s source, needs no gradient, yet keeps the rows
+# inside ggml-opt's graphs. Only operands of the same shape have rows.
+zlm_with_rows <- function(loss, a, b, mode, scale, call) {
+  if (!identical(dim(a), dim(b))) {
+    return(loss)
+  }
+  rl <- zlm_call("zlm_rowloss_op", a$graph, a$ptr, b$ptr, mode, as.double(scale), call)
+  rows <- zlm_new_tensor(rl[[1L]], a$graph, 1L)
+  hook <- zl_scale(zl_sum(zlm_op("step", rows, call = call)), 0)
+  out <- loss + hook
+  out$rowloss <- rl[[2L]]
+  out
 }
 
 # ---- types ---------------------------------------------------------------

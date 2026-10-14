@@ -503,6 +503,8 @@ SEXP zlm_trainer_step(SEXP tptr, SEXP lr) {
   float a = (float) Rf_asReal(lr);
   t->pars.adamw.alpha = a;
   t->pars.sgd.alpha = a;
+  /* draws in the graph use this step's number, 1 for the first */
+  t->g->step = (int64_t) t->evals + 1;
   ggml_opt_alloc(t->opt, true);
   ggml_opt_eval(t->opt, NULL);
   t->evals += 1;
