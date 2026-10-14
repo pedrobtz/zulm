@@ -63,4 +63,5 @@ jobs:
         shell: bash
         run: |
           ls -la zulm.Rcheck/zulm/libs zulm.Rcheck/zulm/libs/* 2>/dev/null | head -20
-          Rscript -e '.libPaths(c("zulm.Rcheck", .libPaths())); str(zulm::zulm_info()[c("variant", "variants_usable", "variants_installed", "compiler")])'
+          # GitHub's x86-64 runners all have AVX2: the probe must find it.
+          Rscript -e '.libPaths(c("zulm.Rcheck", .libPaths())); i <- zulm::zulm_info(); str(i[c("variant", "variants_usable", "variants_installed", "compiler")]); if (R.version$arch %in% c("x86_64", "amd64")) stopifnot(identical(i$variant, "avx2"))'

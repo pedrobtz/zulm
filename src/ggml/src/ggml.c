@@ -629,6 +629,21 @@ FILE * ggml_fopen(const char * fname, const char * mode) {
 
 }
 
+// Called through ggml_to_float_t and ggml_from_float_t: wrappers of the
+// exact types, as calling through a pointer of another type is undefined.
+static void ggml_fp16_to_fp32_row_fn(const void * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t n) {
+    ggml_fp16_to_fp32_row((const ggml_fp16_t *) x, y, n);
+}
+static void ggml_fp32_to_fp16_row_fn(const float * GGML_RESTRICT x, void * GGML_RESTRICT y, int64_t n) {
+    ggml_fp32_to_fp16_row(x, (ggml_fp16_t *) y, n);
+}
+static void ggml_bf16_to_fp32_row_fn(const void * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t n) {
+    ggml_bf16_to_fp32_row((const ggml_bf16_t *) x, y, n);
+}
+static void ggml_fp32_to_bf16_row_ref_fn(const float * GGML_RESTRICT x, void * GGML_RESTRICT y, int64_t n) {
+    ggml_fp32_to_bf16_row_ref(x, (ggml_bf16_t *) y, n);
+}
+
 static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
     [GGML_TYPE_I8] = {
         .type_name                = "i8",
@@ -671,8 +686,8 @@ static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
         .blck_size                = 1,
         .type_size                = sizeof(ggml_fp16_t),
         .is_quantized             = false,
-        .to_float                 = (ggml_to_float_t) ggml_fp16_to_fp32_row,
-        .from_float_ref           = (ggml_from_float_t) ggml_fp32_to_fp16_row,
+        .to_float                 = ggml_fp16_to_fp32_row_fn,
+        .from_float_ref           = ggml_fp32_to_fp16_row_fn,
     },
     [GGML_TYPE_Q1_0] = {
         .type_name                = "q1_0",
@@ -888,8 +903,8 @@ static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
         .blck_size                = 1,
         .type_size                = sizeof(ggml_bf16_t),
         .is_quantized             = false,
-        .to_float                 = (ggml_to_float_t) ggml_bf16_to_fp32_row,
-        .from_float_ref           = (ggml_from_float_t) ggml_fp32_to_bf16_row_ref,
+        .to_float                 = ggml_bf16_to_fp32_row_fn,
+        .from_float_ref           = ggml_fp32_to_bf16_row_ref_fn,
     },
     [31] = { // GGML_TYPE_Q4_0_4_4
         .type_name                = "TYPE_Q4_0_4_4 REMOVED, use Q4_0 with runtime repacking",

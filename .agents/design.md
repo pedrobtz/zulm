@@ -1611,6 +1611,8 @@ now.
 | P6 | backward hook for `CUSTOM` | missing | DFT by product |
 | P7 | global-norm clipping in `ggml-opt` | missing (§6.4) | `clip_norm` refused |
 | P8 | no `static_assert` macro under C23 | warns (below) | none: vendored |
+| P9 | GGUF tensor type checked before it is a `ggml_type` | UB (below) | none: vendored |
+| P10 | type-table functions called through their own types | UB (below) | none: vendored |
 
 **Status, Stage 1 (2026-10-14).** P1, P2 and P7 are drafted against
 `v0.26.0` in `tools/patches/drafts/`, which `tools/vendor-ggml` does not
@@ -1628,6 +1630,18 @@ without one, is suspended for P8 alone.
   "keyword is hidden by macro definition [-Wkeyword-macro]", which R's
   check counts as a significant warning. P8 skips the macro under
   C23. Found by the r-actions `clang23` and `ubuntu-clang` legs.
+- **P9, P10 (found by the native checks, 2026-10-14).** UBSan, as
+  CRAN's sanitizer flavours run it, reported two upstream bugs. P9:
+  `gguf_init_from_reader()` loads a malformed file's tensor type into
+  the `ggml_type` enum before checking its range, an invalid enum load
+  in C++. P10: the CPU type table stores `ggml_vec_dot_f32` and its f16
+  and bf16 siblings, and the f32-to-f16, -bf16 and -i32 converters, cast
+  to function types whose parameters differ, and ggml's own type table
+  does the same for the f16 and bf16 row converters; clang's
+  `-fsanitize=function` reports the call. P10 stores wrappers of the
+  exact types for those entries; the quantised types' entries, which
+  zulm never calls, are left as upstream has them. Both are vendored,
+  like P8, ahead of their upstream pull requests.
 - **P1.** `ggml_mean` over rows returns one value per row, but its
   backward adds the incoming gradient with `ggml_add1_or_set`, which
   asserts `ggml_is_scalar(b)` once a second consumer has already
