@@ -2,7 +2,7 @@
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/pedrobtz/zulm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/pedrobtz/zulm/actions/workflows/R-CMD-check.yaml)
-[![coverage](https://raw.githubusercontent.com/pedrobtz/zulm/main/.github/badges/coverage.svg)](https://github.com/pedrobtz/zulm/actions/workflows/coverage.yaml)
+[![coverage](https://raw.githubusercontent.com/pedrobtz/zulm/gh-pages/badges/coverage.svg)](https://github.com/pedrobtz/zulm/actions/workflows/coverage.yaml)
 <!-- badges: end -->
 
 zulm builds computation graphs of tensors in R, runs them on the CPU,
