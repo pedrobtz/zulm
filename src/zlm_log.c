@@ -15,6 +15,7 @@
 #include <unistd.h>
 #endif
 
+#include "ggml.h"
 #include "zlm_glue.h"
 
 char zlm_stdout_tag;
@@ -22,9 +23,12 @@ char zlm_stderr_tag;
 
 #define ZLM_LOG_CAP 65536
 
+/* Records are "\x1e" + level digit + text, so R can tell ggml's levels
+   apart (design §6.8). Writes to stdout or stderr are level 2 (info). */
 static char zlm_log_buf[ZLM_LOG_CAP];
 static size_t zlm_log_len;
 static int zlm_log_dropped;
+static int zlm_log_last = 3;
 
 /* ggml may write from pool threads; the buffer is guarded by ggml's own
    critical section (ggml-threading.h), a process-wide mutex. */
@@ -35,17 +39,36 @@ static int zlm_is_tag(FILE *stream) {
   return stream == (FILE *) &zlm_stdout_tag || stream == (FILE *) &zlm_stderr_tag;
 }
 
-void zlm_log_append(const char *s, size_t n) {
+void zlm_log_record(int level, const char *s, size_t n) {
   ggml_critical_section_start();
-  size_t room = ZLM_LOG_CAP - 1 - zlm_log_len;
-  if (n > room) {
-    n = room;
-    zlm_log_dropped = 1;
+  if (level == 5) {
+    level = zlm_log_last; /* GGML_LOG_LEVEL_CONT continues the last record */
   }
-  memcpy(zlm_log_buf + zlm_log_len, s, n);
-  zlm_log_len += n;
-  zlm_log_buf[zlm_log_len] = '\0';
+  if (level < 0 || level > 9) level = 3;
+  zlm_log_last = level;
+  size_t room = ZLM_LOG_CAP - 1 - zlm_log_len;
+  if (room < 3) {
+    zlm_log_dropped = 1;
+  } else {
+    if (n > room - 2) {
+      n = room - 2;
+      zlm_log_dropped = 1;
+    }
+    zlm_log_buf[zlm_log_len++] = '\x1e';
+    zlm_log_buf[zlm_log_len++] = (char) ('0' + level);
+    memcpy(zlm_log_buf + zlm_log_len, s, n);
+    zlm_log_len += n;
+    zlm_log_buf[zlm_log_len] = '\0';
+  }
   ggml_critical_section_end();
+}
+
+void zlm_log_append(const char *s, size_t n) {
+  zlm_log_record(2, s, n);
+}
+
+int zlm_log_pending(void) {
+  return zlm_log_len > 0 || zlm_log_dropped;
 }
 
 size_t zlm_log_take(char *out, size_t cap, int *dropped) {
@@ -58,6 +81,12 @@ size_t zlm_log_take(char *out, size_t cap, int *dropped) {
   zlm_log_dropped = 0;
   ggml_critical_section_end();
   return n;
+}
+
+/* ggml_log_set() callback: called from any thread, never touches R. */
+void zlm_ggml_log(enum ggml_log_level level, const char *text, void *user) {
+  (void) user;
+  zlm_log_record((int) level, text, strlen(text));
 }
 
 int zlm_vfprintf(FILE *stream, const char *fmt, va_list ap) {

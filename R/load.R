@@ -122,6 +122,7 @@ zlm_call <- function(name, ...) {
       "zulm_internal_error"
     )
   }
+  on.exit(zlm_flush_log())
   zlm_dot_call(.zlm$routines[[name]], ...)
 }
 

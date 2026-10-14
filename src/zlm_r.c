@@ -25,7 +25,8 @@ static SEXP zlm_condition_call(const char *fun, const char *cls, SEXP extra, con
     SEXP nm = Rf_getAttrib(extra, R_NamesSymbol);
     for (R_xlen_t i = 0; i < n_extra; i++) {
       p = CDR(p);
-      SETCAR(p, VECTOR_ELT(extra, i));
+      /* quoted: the call is evaluated, and a field may be a call itself */
+      SETCAR(p, Rf_lang2(Rf_install("quote"), VECTOR_ELT(extra, i)));
       SET_TAG(p, Rf_installChar(STRING_ELT(nm, i)));
     }
   }

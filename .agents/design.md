@@ -783,6 +783,28 @@ Chronos-2 and most Hugging Face checkpoints; `"interleaved"` is
 ggml itself, and the default because it is upstream's. `n_dims` below
 the head dimension rotates the leading `n_dims` and leaves the rest,
 as upstream documents (`n_dims = 4` on a head of 8 gives `[cscs0000]`).
+**As built in Stage 3 (2026-10-14).** Indices given to `zl_get_rows()`
+count from 0, as the i32 codes of §7.3 do, and are checked against
+their bound on every `zl_forward()`, so the index must be a graph input.
+`zl_tri(type = "lower")` keeps what `lower.tri(diag = TRUE)` selects
+(ggml's `UPPER_DIAG`, since ggml calls the first dimension columns).
+`zl_gelu()` gained `approximate = c("none", "tanh")`: the exact form
+(`ggml_gelu_erf`) by default, as PyTorch's default, because ggml's tanh
+form reads an f16 table and is accurate to about 1e-3 only. A number
+divided by a tensor is `ggml_fill` then `ggml_div`. Only f32 tensors
+enter operations: an f16 or bf16 parameter may be the weight of
+`zl_crossprod()`, the table of `zl_get_rows()` or the input of
+`zl_cast()`, and nothing else, because ggml's CPU kernels assert on
+other type combinations at compute time, where nothing can be caught.
+Operands that are not contiguous (after `zl_permute()` or `zl_t()`) are
+made contiguous before any kernel that is not a view. Forward-only
+graphs are allocated with ggml's graph allocator and run on the CPU
+backend. `zl_forward()` evaluates a copy of the graph (as `ggml-opt`
+evaluates copies of its graphs): `ggml-opt`'s copies inherit the
+original nodes' data pointers, so the original must stay unallocated
+for training, while the allocator may reuse memory between the copy's
+activations. Stage 4 trains on the original through `ggml-opt`.
+
 Elementwise maximum and minimum, powers and `flip` are compositions in
 R of the above (`b + relu(a - b)`, `exp(b * log(a))`, `get_rows` with
 reversed indices) and get no function of their own until a consumer
@@ -976,6 +998,10 @@ ggml's log goes through `ggml_log_set()` into a buffer; zulm emits
 buffered lines as R messages of class `zulm_message` after each call
 returns, at a level set by `options(zulm.log = "warn")`. Lines from
 pool threads are buffered under a mutex and never reach R directly.
+(Stage 3: the buffer holds level-tagged records, 64 KB at most, with a
+note when it overflowed; ggml's writes to stdout and stderr, which
+`zlm_compat.h` catches, are level "info"; levels are "debug", "info",
+"warn", "error" and "none".)
 
 ### 6.9 Inference graphs
 

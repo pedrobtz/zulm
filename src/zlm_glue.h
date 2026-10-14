@@ -10,6 +10,8 @@ extern "C" {
 
 /* zlm_log.c */
 void zlm_log_append(const char *s, size_t n);
+void zlm_log_record(int level, const char *s, size_t n);
+int zlm_log_pending(void);
 size_t zlm_log_take(char *out, size_t cap, int *dropped);
 void zlm_fatal_message(const char *msg);
 

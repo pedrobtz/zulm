@@ -80,14 +80,49 @@ SEXP zlm_native_info(void) {
   return out;
 }
 
+/* list(levels, texts) of the buffered log records, oldest first, with a
+   "dropped" attribute when the buffer overflowed. */
 SEXP zlm_log_drain(void) {
   static char buf[65536];
   int dropped = 0;
-  zlm_log_take(buf, sizeof buf, &dropped);
-  SEXP out = PROTECT(Rf_mkString(buf));
+  size_t n = zlm_log_take(buf, sizeof buf, &dropped);
+  int count = 0;
+  for (size_t i = 0; i < n; i++) count += buf[i] == '\x1e';
+  SEXP levels = PROTECT(Rf_allocVector(INTSXP, count));
+  SEXP texts = PROTECT(Rf_allocVector(STRSXP, count));
+  int k = -1;
+  size_t start = 0;
+  for (size_t i = 0; i <= n; i++) {
+    if (i == n || buf[i] == '\x1e') {
+      if (k >= 0) {
+        SET_STRING_ELT(texts, k, Rf_mkCharLenCE(buf + start, (int) (i - start), CE_UTF8));
+      }
+      if (i < n) {
+        k++;
+        INTEGER(levels)[k] = i + 1 < n ? buf[i + 1] - '0' : 3;
+        start = i + 2 <= n ? i + 2 : n;
+        i++;
+      }
+    }
+  }
+  SEXP out = PROTECT(Rf_allocVector(VECSXP, 2));
+  SET_VECTOR_ELT(out, 0, levels);
+  SET_VECTOR_ELT(out, 1, texts);
   Rf_setAttrib(out, Rf_install("dropped"), Rf_ScalarLogical(dropped));
-  UNPROTECT(1);
+  UNPROTECT(3);
   return out;
+}
+
+/* Internal: one record through ggml's own logger, for the tests. */
+void ggml_log_internal(enum ggml_log_level level, const char *format, ...);
+
+SEXP zlm_log_emit(SEXP level, SEXP text) {
+  ggml_log_internal((enum ggml_log_level) Rf_asInteger(level), "%s", CHAR(STRING_ELT(text, 0)));
+  return R_NilValue;
+}
+
+SEXP zlm_log_pending_(void) {
+  return Rf_ScalarLogical(zlm_log_pending());
 }
 
 /* Design §13.2: a construction ggml asserts on, run under the guard.

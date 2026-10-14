@@ -27,3 +27,24 @@
 * Every error inherits `zulm_error` and every warning `zulm_warning`; see
   `?"zulm-conditions"` for the classes. Allocations are checked against
   `getOption("zulm.max_bytes")` (4 GiB by default).
+
+* Graphs: `zl_graph()` builds a graph once from an R function, `zl_int()`
+  declares integer inputs, `zl_forward()` runs it any number of times on
+  new inputs, and `zl_graph_info()` describes it.
+
+* Operations on tensors inside a graph: `+`, `-`, `*`, `/` with
+  broadcasting, `zl_scale()`, `zl_sum()`, `zl_sum_rows()`,
+  `zl_mean_rows()`, `zl_cumsum()`, the elementwise functions
+  (`zl_sqr()` to `zl_tanh()`, `zl_gelu()`), `zl_swiglu()`,
+  `zl_crossprod()`, `zl_reshape()`, `zl_permute()`, `zl_t()`,
+  `zl_cont()`, `zl_view()`, `zl_concat()`, `zl_pad()`, `zl_get_rows()`,
+  `zl_where()`, `zl_clamp()`, `zl_tri()`, `zl_softmax()` with masks,
+  `zl_causal_mask()`, `zl_rope()` in both conventions, `zl_rms_norm()`,
+  `zl_layer_norm()`, the losses `zl_cross_entropy()`, `zl_mse()` and
+  `zl_mae()`, and `zl_cast()`.
+
+* Every argument 'ggml' would assert on is checked first; an assertion
+  that still happens while a graph is built is `zulm_engine_error`.
+
+* 'ggml''s log becomes messages of class `zulm_message`, at the level of
+  `options(zulm.log =)` (`"warn"` by default).
