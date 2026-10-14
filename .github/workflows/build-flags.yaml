@@ -1,0 +1,66 @@
+# Build gates the r-actions check does not fail on, because they are NOTEs
+# (design §13.1, §13.3, §13.4): a non-portable compilation flag, a pragma
+# NOTE, a compiled-code NOTE (abort, exit or stdio symbols in any of the
+# variant shared objects), and any exported symbol besides R_init_. CRAN's
+# pretest rejects the first three; the last is the hidden-symbols rule R3.
+on:
+  push:
+    branches: [main, master]
+    paths-ignore: ['**.md', '.agents/**', '_pkgdown.yml', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', '.agents/**', '_pkgdown.yml', 'docs/**']
+
+name: build-flags
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  flags:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+    runs-on: ${{ matrix.os }}
+    name: flags, compiled code, exports (${{ matrix.os }})
+    env:
+      _R_CHECK_FORCE_SUGGESTS_: false
+      _R_CHECK_CRAN_INCOMING_: false
+      MAKEFLAGS: -j4
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+      - name: R CMD check --as-cran
+        shell: bash
+        run: |
+          R CMD build --no-manual --no-build-vignettes .
+          R CMD check --as-cran --no-manual --ignore-vignettes zulm_*.tar.gz || true
+          grep -E "^Status|NOTE|WARNING|ERROR" zulm.Rcheck/00check.log || true
+      - name: no non-portable flags, clean compiled-code check
+        shell: bash
+        run: ./tools/check-build-log zulm.Rcheck/00check.log
+      - name: no pragma NOTE
+        shell: bash
+        run: |
+          if grep -q '^\* checking pragmas in C/C++ headers and code \.\.\. \(NOTE\|WARNING\)' zulm.Rcheck/00check.log; then
+            sed -n '/checking pragmas/,/^\* checking/p' zulm.Rcheck/00check.log
+            exit 1
+          fi
+      - name: every shared object exports only its R_init_ (design §13.3)
+        shell: bash
+        run: ./tools/check-exports zulm.Rcheck/zulm/libs
+      - name: the check installed every variant
+        shell: bash
+        run: |
+          ls -la zulm.Rcheck/zulm/libs zulm.Rcheck/zulm/libs/* 2>/dev/null | head -20
+          Rscript -e '.libPaths(c("zulm.Rcheck", .libPaths())); str(zulm::zulm_info()[c("variant", "variants_usable", "variants_installed", "compiler")])'

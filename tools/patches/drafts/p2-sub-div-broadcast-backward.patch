@@ -1,0 +1,39 @@
+From: Pedro Baltazar <pedrobtz@gmail.com>
+Subject: [PATCH P2] ggml : reduce broadcast gradients in SUB and DIV backward
+
+Upstream pull request: (not opened yet; see design §9.3)
+
+ADD and MUL pass a broadcast second operand's gradient through
+ggml_repeat_back(); SUB and DIV passed the full-shape gradient, and
+ggml_compute_backward() then asserted ggml_are_same_shape(src1, grad):
+reproduced at ggml.c:7241 with a 4 x 3 minus a 1 x 3. Reduce the
+gradient to src1's shape the same way when the shapes differ.
+
+--- a/src/ggml.c
++++ b/src/ggml.c
+@@ -6825,7 +6825,11 @@
+                 ggml_add_or_set(ctx, cgraph, isrc0, grad);
+             }
+             if (src1_needs_grads) {
+-                ggml_sub_or_set(ctx, cgraph, isrc1, grad);
++                struct ggml_tensor * tmp = grad;
++                if (!ggml_are_same_shape(src0, src1)) {
++                    tmp = ggml_repeat_back(ctx, tmp, src1);
++                }
++                ggml_sub_or_set(ctx, cgraph, isrc1, tmp);
+             }
+         } break;
+         case GGML_OP_MUL: {
+@@ -6845,7 +6849,11 @@
+                 ggml_add_or_set(ctx, cgraph, isrc0, ggml_div(ctx, grad, src1));
+             }
+             if (src1_needs_grads) {
+-                ggml_sub_or_set(ctx, cgraph, isrc1, ggml_mul(ctx, grad, ggml_div(ctx, tensor, src1)));
++                struct ggml_tensor * tmp = ggml_mul(ctx, grad, ggml_div(ctx, tensor, src1));
++                if (!ggml_are_same_shape(src0, src1)) {
++                    tmp = ggml_repeat_back(ctx, tmp, src1);
++                }
++                ggml_sub_or_set(ctx, cgraph, isrc1, tmp);
+             }
+         } break;
+         case GGML_OP_SQR: {

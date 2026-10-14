@@ -20,7 +20,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | Stage | Title | Issue | Pull request | Done |
 | --- | --- | --- | --- | --- |
 | 0 | [Package identity](#stage-0--package-identity) | [#2](https://github.com/pedrobtz/zulm/issues/2) | [#19](https://github.com/pedrobtz/zulm/pull/19) | 2026-10-14 |
-| 1 | [Vendored ggml and the CPU-dispatch go/no-go](#stage-1--vendored-ggml-and-the-cpu-dispatch-gono-go) | [#3](https://github.com/pedrobtz/zulm/issues/3) | | |
+| 1 | [Vendored ggml and the CPU-dispatch go/no-go](#stage-1--vendored-ggml-and-the-cpu-dispatch-gono-go) | [#3](https://github.com/pedrobtz/zulm/issues/3) | [#21](https://github.com/pedrobtz/zulm/pull/21) | 2026-10-14 |
 | 2 | [Tensors, types, store and GGUF](#stage-2--tensors-types-store-and-gguf) | [#4](https://github.com/pedrobtz/zulm/issues/4) | | |
 | 3 | [Graphs, operations, forward and validation](#stage-3--graphs-operations-forward-and-validation) | [#5](https://github.com/pedrobtz/zulm/issues/5) | | |
 | 4 | [Autograd, trainer and optimisers](#stage-4--autograd-trainer-and-optimisers) | [#6](https://github.com/pedrobtz/zulm/issues/6) | | |
@@ -145,6 +145,16 @@ settled.
 
 **Design.** §9, §12, §13.1 to §13.4; decisions D2, D3, D9, D10, D28,
 D29, D40, D41; open question 7.
+
+**Deviations (2026-10-14).** P1, P2 and P7 are drafted in
+`tools/patches/drafts/` but their upstream pull requests are not opened:
+that is the maintainer's action, so the criterion "P1, P2 and P7 name
+their upstream pull requests" moves to Stage 4, which vendors them.
+Patch P8 (C23 `static_assert`) was needed for the clang legs and is
+vendored ahead of its upstream pull request (design §9.3). `abort` is
+not linked at all (design §13.2), so no NOTE needs documenting.
+`build-flags` and `portability` are local workflows, as zufft's are;
+r-actions has no reusable version of them.
 
 ## Stage 2 — Tensors, types, store and GGUF
 

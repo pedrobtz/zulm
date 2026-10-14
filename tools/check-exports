@@ -1,0 +1,35 @@
+#!/bin/sh
+# Fails unless every shared object of an installed zulm exports only its
+# R_init_ function (design §13.3, R3).
+#
+#   tools/check-exports <path to installed zulm/libs>
+set -eu
+libs=${1:?usage: tools/check-exports <installed zulm/libs directory>}
+fail=0
+n=0
+for so in "$libs"/zulm*.so "$libs"/zulm*.dll "$libs"/*/zulm*.dll; do
+  [ -f "$so" ] || continue
+  n=$((n + 1))
+  case $(uname -s) in
+    Linux) syms=$(nm -D --defined-only "$so" | awk '$2 ~ /^[A-Z]$/ && $2 != "U" {print $3}') ;;
+    Darwin) syms=$(nm -gU "$so" | awk '{print $3}' | sed 's/^_//') ;;
+    # objdump -p lists exports under "[Ordinal/Name Pointer] Table", one
+    # "[   0] name" line each; the header line itself is skipped.
+    *) syms=$(objdump -p "$so" | sed -n '/\[Ordinal\/Name Pointer\] Table/,/^$/p' |
+         grep -v 'Ordinal/Name' | awk 'NF >= 2 && $1 ~ /^\[/ {print $NF}') ;;
+  esac
+  name=$(basename "$so" | sed -E 's/\.(so|dll)$//')
+  extra=$(printf '%s\n' "$syms" | grep -v -x "R_init_$name" | grep -v '^$' || true)
+  if ! printf '%s\n' "$syms" | grep -q -x "R_init_$name"; then
+    echo "FAIL $so does not export R_init_$name (found: $(echo $syms | head -c 200))"
+    fail=1
+  elif [ -n "$extra" ]; then
+    echo "FAIL $so exports more than R_init_$name:"
+    printf '%s\n' "$extra" | head -20
+    fail=1
+  else
+    echo "ok  $so exports only R_init_$name"
+  fi
+done
+[ "$n" -gt 0 ] || { echo "FAIL no zulm shared objects under $libs"; exit 1; }
+exit "$fail"

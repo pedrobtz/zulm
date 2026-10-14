@@ -6,5 +6,5 @@
 # namespaces in use until the stages that call them land.
 #' @importFrom zujson json_parse_raw
 #' @importFrom zurand rng_key
-#' @useDynLib zulm, .registration = TRUE
+#' @useDynLib zulm, .registration = TRUE, .fixes = "C_"
 NULL

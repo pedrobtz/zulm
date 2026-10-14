@@ -1,0 +1,30 @@
+#!/bin/sh
+# Fails if an R CMD check log shows a build problem the r-actions check lets
+# through (it fails only on WARNING): the "non-portable flag(s)" NOTE, which
+# guards src/Makevars (design §13.4), or any NOTE from "checking compiled
+# code", which is where R reports abort, exit, printf or stdio symbols in
+# the shared object. CRAN's pretest rejects both.
+#
+#   tools/check-build-log <pkg>.Rcheck/00check.log
+set -eu
+log=${1:?usage: tools/check-build-log <path to 00check.log>}
+[ -f "$log" ] || { echo "no such log: $log" >&2; exit 2; }
+fail=0
+
+if ! grep -q 'checking compilation flags used' "$log"; then
+  echo "FAIL the log has no compilation-flags check; run with --as-cran"
+  fail=1
+fi
+if grep -q 'non-portable flag' "$log"; then
+  echo "FAIL non-portable compilation flags:"
+  sed -n '/non-portable flag/,/^\*/p' "$log"
+  fail=1
+fi
+if grep -Eq '^\* checking compiled code \.\.\. (NOTE|WARNING)' "$log"; then
+  echo "FAIL compiled-code check:"
+  sed -n '/^\* checking compiled code/,/^\* checking/p' "$log"
+  fail=1
+fi
+
+[ "$fail" -eq 0 ] && echo "ok  no non-portable flags and a clean compiled-code check"
+exit "$fail"

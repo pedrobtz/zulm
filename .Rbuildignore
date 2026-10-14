@@ -5,3 +5,5 @@
 ^docs$
 ^pkgdown$
 ^CLAUDE\.md$
+^src/Makevars$
+^tools$

@@ -1,0 +1,46 @@
+# The vendored ggml tree (design §9.1, §9.2): r-actions' guard runs
+# tools/verify-ggml and refuses vendored changes that do not update
+# src/ggml/VERSION; `upstream` re-vendors the pinned tag and requires the
+# result to equal src/ggml/ byte for byte; `generated` requires the variant
+# wrappers and make fragments to be what tools/gen-build writes.
+on:
+  push:
+    branches: [main, master]
+    paths: ['src/**', 'tools/**', '.github/workflows/vendor.yaml']
+  pull_request:
+    paths: ['src/**', 'tools/**', '.github/workflows/vendor.yaml']
+
+name: vendor
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  vendor:
+    uses: pedrobtz/r-actions/.github/workflows/vendor.yml@v1
+    with:
+      vendor-dir: src/ggml
+      verify: tools/verify-ggml
+      must-update: |
+        src/ggml/VERSION
+
+  upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: re-vendor the pinned tag and compare
+        run: tools/vendor-ggml --verify
+
+  generated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: tools/gen-build output is committed
+        run: |
+          tools/gen-build
+          git status --porcelain -- src
+          test -z "$(git status --porcelain -- src)"

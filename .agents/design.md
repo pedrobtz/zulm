@@ -585,8 +585,9 @@ C glue (src/zlm_*.c): external pointers, R vectors <-> f32/i32/f16/bf16,
    |
    v
 C++ shim (src/zlm_shim.cpp): extern "C"; calls ggml under try/catch;
-         the ggml abort callback throws zlm::ggml_failure during graph
-         construction (ggml's C built with -fexceptions); logs buffered
+         the ggml abort callback throws during graph construction
+         (through ggml's C frames, on their default unwind tables);
+         logs buffered
    |
    v
 ggml (vendored, unmodified + patches): ggml-base (graph, autograd,
@@ -1540,10 +1541,17 @@ static inline const zulm_api *zulm_api_get(void);
 
 ### 9.2 Build-level adaptation without patches
 
-- `-include zlm_compat.h` on ggml's sources redirects `printf`, `puts`,
-  `putchar`, `fprintf`, `vfprintf`, `fputs`, `fflush`, `stdout` and
-  `stderr` to zulm's log buffer, as ggmlR's header does for the same
-  CRAN rule, but it does not touch `abort()` (§13.2).
+- `zlm_compat.h`, included by the wrapper translation unit of every
+  ggml source (§13.4), redirects `printf`, `vprintf`, `puts`,
+  `putchar`, `fprintf`, `vfprintf`, `sprintf`, `fputs`, `fputc`,
+  `fflush`, `fwrite`, `stdout` and `stderr` to zulm's log buffer when
+  they write to the standard streams (gguf's file writes pass through),
+  as ggmlR's header does for the same CRAN rule. The macros are
+  function-like, so `__attribute__((format(printf, …)))` is untouched.
+  **Revised in Stage 1:** it also turns `abort()` and the backtrace's
+  `_Exit()` into `zlm_abort()`, a trap (§13.2), so no symbol on R's
+  compiled-code list is linked. ggml never qualifies these names with
+  `std::`, which a test checks.
 - **Diagnostic pragmas are stripped by the vendor script.** `R CMD
   check --as-cran` sets `_R_CHECK_PRAGMAS_`, and `.check_pragmas()`
   (`QC.R`) scans every C and C++ file under `src/` and `inst/include`
@@ -1564,8 +1572,12 @@ static inline const zulm_api *zulm_api_get(void);
   pattern so that a re-vendoring cannot reintroduce one. The warnings
   the pragmas silenced then appear in the install log, which is
   acceptable (§13.3).
-- `GGML_USE_CPU_REPACK` and `GGML_USE_LLAMAFILE` (§13.1) as upstream
-  defines them; no OpenMP.
+- `GGML_USE_CPU_REPACK` and `GGML_SCHED_MAX_COPIES=4` as upstream's
+  CMake defines them, and the feature-test macros it sets per platform
+  (`_XOPEN_SOURCE=600`, `_GNU_SOURCE` on Linux, `_DARWIN_C_SOURCE` on
+  macOS), from the force-included header; no OpenMP.
+  `GGML_USE_LLAMAFILE` is decided by Stage 1's measurements (§13.1,
+  question 7).
 
 ### 9.3 Patches
 
@@ -1582,7 +1594,24 @@ now.
 | P5 | backtrace without `fork` | §13.3 | abort callback set |
 | P6 | backward hook for `CUSTOM` | missing | DFT by product |
 | P7 | global-norm clipping in `ggml-opt` | missing (§6.4) | `clip_norm` refused |
+| P8 | no `static_assert` macro under C23 | warns (below) | none: vendored |
 
+**Status, Stage 1 (2026-10-14).** P1, P2 and P7 are drafted against
+`v0.26.0` in `tools/patches/drafts/`, which `tools/vendor-ggml` does not
+apply; Stage 4 moves each up a directory once tests pin its behaviour.
+P8 is vendored now, because the check fails without it. None of the
+four has an upstream pull request yet: opening them is the
+maintainer's call, and each patch header and this table get the link
+when it exists. Until then the rule above, that no patch is vendored
+without one, is suspended for P8 alone.
+
+- **P8.** ggml's C headers (`ggml-common.h`, `ggml-impl.h`) define
+  `static_assert` as a macro when it is not one. Under C23 it is a
+  keyword, so the macro hides it, and clang 22 and 23 compiling C as
+  `-std=gnu23` (CRAN's `r-devel-linux-x86_64-debian-clang`) warn
+  "keyword is hidden by macro definition [-Wkeyword-macro]", which R's
+  check counts as a significant warning. P8 skips the macro under
+  C23. Found by the r-actions `clang23` and `ubuntu-clang` legs.
 - **P1.** `ggml_mean` over rows returns one value per row, but its
   backward adds the incoming gradient with `ggml_add1_or_set`, which
   asserts `ggml_is_scalar(b)` once a second consumer has already
@@ -1767,6 +1796,29 @@ SIMD path because ggml's x86 mappings start at SSE3. At two threads the
 §1.1 step took 61.7 ms against 109.5 ms at one (an `-O3` baseline
 build), 1.77×.
 
+**Measured in Stage 1 (2026-10-14)**, through R (`tools/bench-variants.R`
+in the `measure` workflow), best of three runs of twenty 512³ f32
+products, GFLOP/s at one and two threads; R's default flags (`-O2`):
+
+| Runner, compiler | `baseline` | `sse42` | `avx2` | `-mavx2` build | `avx2` + llamafile |
+| --- | --- | --- | --- | --- | --- |
+| Linux, Xeon (Intel), GCC | 4.3 / 8.6 | 27.3 / 52.7 | 46.6 / 89.4 | 43.7 / 82.9 | 78.7 / 150.2 |
+| Linux, EPYC 7763, clang | 2.2 / 4.4 | 20.5 / 40.1 | 31.1 / 60.8 | 31.2 / 61.0 | 87.1 / 162.9 |
+| macOS x86-64 (Intel), Apple clang | 18.6 / 30.9 | 17.2 / 32.1 | 31.7 / 61.3 | 31.4 / 60.3 | 102.1 / 162.5 |
+| Windows, EPYC 7763, Rtools GCC | 2.2 / 4.3 | 17.0 / 31.3 | 31.3 / 58.6 | — | see §13.1 |
+| macOS arm64 (M1, virtual), Apple clang | `neon`: 18.4 / 35.8 | | | | `neon` + llamafile: 76.7 / 133.6 |
+
+GCC with `-mavx2 -funroll-loops` gave 47.1 / 88.4, the `avx2`
+variant's speed: the unrolling pragma buys what the flag buys. Each
+variant's result was bit-identical at one, two and four threads, and
+the `avx2` variant's bits were the same under GCC and clang on Linux,
+on Intel macOS and on Windows (hash `0532cf3b` in every row). The x86-64
+macOS `baseline` matches `sse42` because Apple's default target already
+has SSSE3 and SSE4.1. Install with `MAKEFLAGS=-j4` took 43–96 s; the
+three x86-64 variants take 5.8 MB of `libs/` without debug information
+(the `clang23` leg) and 37 MB with GCC's `-g`; R 4.6 reports installed
+size as INFO, not a NOTE.
+
 Targets: on an AVX2 machine, from a build made with CRAN's default
 flags, `zl_crossprod()` of 512³ at least 25 GFLOP/s and the §1.1 step at
 most 35 ms at one thread; two threads at least 1.6× one; R overhead in
@@ -1909,6 +1961,53 @@ build; every x86-64 CPU since 2008 has SSE4.2, but it is still a flagged
 `-m` flag unless the pragma route works) and returns to the maintainer
 with that trade-off.
 
+**Stage 1 result (2026-10-14): go.** The variant scheme passes
+`R CMD check --as-cran` with no non-portable-flag, pragma or
+compiled-code NOTE on every r-actions leg, x86-64 macOS included, and
+`build-flags` checks it on Linux, both macOS architectures and Windows.
+What it took, and what was measured:
+
+- **No `-include`, no `-m` flag.** Each ggml source is compiled through
+  a generated wrapper translation unit under `src/zlm_v/<variant>/`
+  that defines the variant's macro, includes `zlm_variant_begin.h` (the
+  force-included header), the ggml source, and `zlm_variant_end.h`;
+  `tools/gen-build` writes them. So the variant is chosen without any
+  flag at all, and R's own suffix rules compile it.
+- **What is built per variant.** The kernels (`ggml-cpu/` except
+  `ggml-cpu.cpp`, plus the architecture's `arch/` files) are built once
+  per variant; ggml's base (`ggml.c`, `ggml-alloc.c`, `ggml-quants.c`,
+  `ggml-backend*.cpp`, `ggml-opt.cpp`, `gguf.cpp`,
+  `ggml-threading.cpp`), `ggml-cpu/ggml-cpu.cpp` and zulm's glue are
+  built once and linked into every variant. The five C++ files that
+  failed under GCC's target pragma are among the shared ones, so no file
+  is built under a pragma it cannot take. Mixing is safe: a variant is
+  loaded only on a CPU that runs all of it.
+- **clang works.** `#pragma clang attribute push` with the target
+  attribute, and the ISA macros defined by the header, compile every
+  kernel on Apple clang and on clang 22 and 23; the x86-64 macOS
+  `avx2` variant runs at the `-mavx2` build's speed with the same bits.
+- **Speed.** The `avx2` variant is within 15 % of the `-mavx2` build
+  under GCC (6 % faster, from the unrolling pragma) and under clang
+  (equal); see §12.
+- **Windows.** The `avx2` variant built by Rtools' MinGW-w64 GCC loads
+  and runs (31.3 GFLOP/s, the same bits as Linux); zufft's crash is
+  specific to ducc0. ggml's Win32 threads ran the suite and the
+  benchmarks at one to four threads without a hang. The native hook
+  stays off on Windows (§13.4) until someone needs it.
+- **Probe.** `zulm.so` (the registered DLL) holds only
+  `zlm_cpu_variants()`, which asks `__builtin_cpu_supports()` for AVX2,
+  FMA, BMI2 and F16C (then SSE4.2 and POPCNT); `.onLoad` loads the best
+  installed variant with `dyn.load()`, or the one
+  `options(zulm.variant =)` names, and calls its routines through the
+  native-symbol objects it registered. Every runner loaded the variant
+  its CPU supports best.
+- **Question 7, decided from these measurements.** llamafile's kernels
+  go in (`GGML_USE_LLAMAFILE`): 2.5–4× the plain kernels on every
+  platform and bit-identical across thread counts. The unrolling pragma
+  stays, for GCC. No `avx512` variant: no CI runner has AVX-512, and the
+  drafting session measured 3 % over `-O3` AVX2. Stage 4 re-checks
+  thread invariance on training steps, the measure question 7 named.
+
 ### 13.2 Assertions, aborts and the main thread
 
 `GGML_ASSERT` and `GGML_ABORT` call `ggml_abort()`, which formats the
@@ -1929,24 +2028,25 @@ zulm's design, in order of reliance:
    flag; the abort callback, seeing the flag, throws a C++ exception
    that the shim catches and turns into `zulm_engine_error`. It never
    returns, so `abort()` is not reached, and the half-built context is
-   discarded. ggml's C sources are compiled with `-fexceptions` so that
-   unwinding through their frames is defined (GCC and clang; R's check
-   does not flag it). Verified in the drafting session on Linux with
-   GCC 13.3: the P2 assertion was raised and caught three times in a
-   row, and a computation afterwards was correct. On Windows, Rtools'
-   GCC unwinds with SEH rather than DWARF, and C frames need the same
-   `-fexceptions` to carry unwind tables; whether a throw from the
-   abort callback crosses `ggml_abort`'s C frames there is unverified
-   and is a Stage 1 item beside the threading check (§13.3). If it
-   does not, the fallback on Windows is prevention alone (layer 1),
-   with the assertion message reaching the crash log.
+   discarded. Verified in the drafting session on Linux with GCC 13.3:
+   the P2 assertion was raised and caught three times in a row, and a
+   computation afterwards was correct. **Stage 1 (2026-10-14):** no
+   `-fexceptions` is needed, and none is set. The throw crosses
+   `ggml_abort`'s C frames on the unwind tables every supported
+   compiler emits by default (DWARF CFI on x86-64 and arm64 Linux,
+   compact unwind on macOS, SEH tables on Windows x64), and ggml's C
+   has no cleanup that would need `-fexceptions` to run. The test that
+   raises a `ggml_add` shape assertion as `zulm_engine_error` three
+   times and then computes correctly passes on every r-actions leg,
+   Windows included, so prevention is not the only layer there.
 3. **The fatal path.** An assertion during a computation cannot be
    recovered on any thread: on a pool thread an exception cannot reach
    the main thread and `longjmp` to another thread is undefined; on the
    main thread (worker 0) the other workers would be left waiting at a
-   barrier. Without the flag the callback records the message for the
-   crash log and returns, and ggml calls `abort()`. Prevention is what
-   keeps this path unreachable, and §15 measures it.
+   barrier. Without the flag the callback writes the message to file
+   descriptor 2 for the crash log and returns, and ggml's `abort()`,
+   which `zlm_compat.h` turns into a trap, stops the process.
+   Prevention is what keeps this path unreachable, and §15 measures it.
 
 ggmlR's approach, a macro turning `abort()` into `Rf_error()`, was
 considered and rejected: it `longjmp`s across C++ frames and, from a
@@ -1963,16 +2063,32 @@ stdio names; P5 removes the backtrace's `fork`, `execlp`, `_Exit` and
 `prctl`; `abort` remains, reached only on the fatal path, and the
 submission comments say so plainly rather than hiding the symbol.
 
+**Revised in Stage 1 (2026-10-14).** CRAN's incoming pretest is
+automated and reads no submission comment, and a family package's first
+upload was archived for justifying such a symbol instead of removing
+it. So `zlm_compat.h` maps `abort()` and `_Exit()` to `zlm_abort()`,
+which executes a trap instruction (`__builtin_trap()`): the fatal path
+still ends the process at once, by `SIGILL` or `SIGTRAP` instead of
+`SIGABRT`, after the message reaches file descriptor 2. No symbol on
+R's list is linked, so P5 is not needed for the check (R does not list
+`fork`, `execlp` or `prctl`); it stays a candidate for upstream. The
+`build-flags` workflow fails if any listed symbol returns.
+
 ### 13.3 Everywhere
 
 - C17 for the glue and ggml's C, C++17 for the shim and ggml's C++
   (`CXX_STD = CXX17`); no OpenMP (ggml's own pool is used; upstream's
   OpenMP path also calls `setenv("KMP_BLOCKTIME")`); no system
-  libraries; `SystemRequirements: GNU make` if the variant build of
-  §13.4 needs pattern rules or conditionals, which Stage 1 settles.
+  libraries. **Stage 1:** no GNU make: the wrappers are ordinary
+  sources for R's suffix rules, `configure` (POSIX `sh`) appends the
+  variant set for the compiler's target to `src/Makevars`, and each
+  variant is linked by an explicit rule, so `SystemRequirements` names
+  only C++17. C is compiled in R's default standard (C17 or C23,
+  §9.3 P8).
 - Warnings: the CPU-only sources gave 231 warnings under
   `-Wall -Wextra -pedantic`, all `-Wunused-function`, 220 of them from
-  `static` helpers in `ggml-impl.h` repeated per file. Upstream builds
+  `static` helpers in `ggml-impl.h` repeated per file (Stage 1's
+  arm64 build: 232, all `-Wunused-function`). Upstream builds
   with `-Wno-unused-function`, which R's check would report as a
   warning-suppressing flag; zulm lets them stand (they are not on
   CRAN's list of significant warnings, unverified against the current
@@ -1988,6 +2104,14 @@ submission comments say so plainly rather than hiding the symbol.
   only `R_init_zulm` (and `R_init_` of each variant). In the
   drafting build the Linux version script left one dynamic symbol;
   Stage 1 audits all three with `nm -D`, `nm -gU` and `objdump -p`.
+  **Stage 1:** visibility alone leaves libstdc++'s template instances
+  (`std::map`, `std::mt19937`, a ggml template) exported on Linux,
+  because libstdc++ declares `std` with default visibility; `configure`
+  therefore links each variant with a version script whenever a test
+  link shows the linker takes one. macOS needs nothing beyond
+  visibility, and Windows links each DLL with a `.def` file naming its
+  `R_init_`. `tools/check-exports`, run by `build-flags`, fails if any
+  shared object exports anything else.
 - `getenv()` reads only debugging switches (`GGML_SCHED_DEBUG`,
   `GGML_META_DEBUG`, `GGML_NO_BACKTRACE`) and `GGML_CPU_DISABLE_FUSION`,
   which changes kernel fusion and so possibly bits; `zulm_info()`
@@ -2023,22 +2147,34 @@ as read in R's `check.R`:
 - **R's flags come last**, so an optimisation level in `PKG_*FLAGS` is
   overridden by the site's `-O2`; zulm sets none.
 
-The file, in outline (Stage 1 writes the real one and records it here):
+The file, as Stage 1 wrote it (`src/Makevars.in`; `configure` appends
+the fragment `src/make/<set>.mk` that `tools/gen-build` generated for
+the target, `x86_64`, `arm64`, `generic` or a `native_*` set):
 
 ```make
-# src/Makevars (design §13.4)
+# src/Makevars.in (design §13.4)
 CXX_STD = CXX17
-PKG_CPPFLAGS = -I. -Iggml/include -I../inst/include -DGGML_VERSION=... -pthread
-# Hidden symbols the way Makeconf spells them. ZULM_CFLAGS and
-# ZULM_CXXFLAGS are the opt-in native-build hooks: make reads them from
-# the environment, and they are empty unless the user sets them, so
-# CRAN builds and R CMD check see only the visibility macros.
-PKG_CFLAGS   = $(C_VISIBILITY) $(ZULM_CFLAGS)
+PKG_CPPFLAGS = -I. -Iggml/include -Iggml/src -Iggml/src/ggml-cpu \
+  -DGGML_USE_CPU_REPACK -DGGML_USE_LLAMAFILE -DGGML_SCHED_MAX_COPIES=4 -pthread
+PKG_CFLAGS = $(C_VISIBILITY) $(ZULM_CFLAGS)
 PKG_CXXFLAGS = $(CXX_VISIBILITY) $(ZULM_CXXFLAGS)
-PKG_LIBS     = -pthread
-# ... variant rules (§13.1): the same sources built once per ISA level
-# with the force-included header selecting the target by pragma ...
+PKG_LIBS = -pthread
+OBJECTS = zulm.o                 # the registered DLL is the probe alone
+
+# src/make/x86_64.mk (generated), in outline:
+ZLM_COMMON = zlm_glue.o ... zlm_v/common/ggml.o ...
+ZLM_VARIANTS = zulm_baseline.so zulm_sse42.so zulm_avx2.so
+all: $(SHLIB) $(ZLM_VARIANTS)
+ZLM_OBJ_avx2 = zlm_v/avx2/zlm_init.o zlm_v/avx2/ggml-cpu_ops.o ...
+zulm_avx2.so: $(ZLM_COMMON) $(ZLM_OBJ_avx2)
+	$(SHLIB_LINK) -o $@ $(ZLM_COMMON) $(ZLM_OBJ_avx2) $(ZLM_LDFLAGS_avx2) $(ALL_LIBS)
 ```
+
+Target names carry `.so` (or `.dll` in `Makevars.win`) literally: make
+expands them when it reads `Makevars`, before `Makeconf` defines
+`SHLIB_EXT`. `ZLM_LDFLAGS_<variant>` is the version script of §13.3,
+set by `configure` where the linker takes one. `src/install.libs.R`
+copies every shared object into `libs/` and records the hooks.
 
 **The native hook, as zufft does it (D40).** A user who wants a build
 for their own CPU sets the two variables and installs from source:
@@ -2060,7 +2196,8 @@ install.packages("zulm", type = "source")
   force-included header skips its target pragma when the compiler
   already defines the ISA macros (`__AVX2__` and so on), so the flag,
   not the pragma, decides the kernels. `.onLoad` loads `native` without
-  probing. The conditional needs GNU make (§13.3). A native build is its
+  probing. `configure` makes the choice, so no GNU make is needed
+  (§13.3). A native build is its
   own ISA variant under §6.5: results reproduce within it, and not
   against CRAN's binaries.
 - **Not on Windows.** `Makevars.win` carries no hook, as zufft's does
@@ -2253,7 +2390,10 @@ regrouping; `zl_spectrum()` agrees with `zufft` and `stats::fft()`.
    and should the AVX2 variant use llamafile kernels or the unrolling
    pragma of §13.1, or both? Recommended: decide from Stage 1's
    measurements of training steps and thread-count determinism, not
-   from matrix products alone.
+   from matrix products alone. **Decided 2026-10-14 (Stage 1), from
+   products, as no training step exists before Stage 4:** both, and no
+   `avx512` variant (§13.1). Stage 4 re-checks thread invariance on
+   training steps and revisits llamafile if it fails.
 8. **Long contexts.** The post evaluates on 10 240-event contexts; plain
    attention then holds a 10 240² score matrix (419 MB in f32) per head
    and sequence. Upstream's forward-only flash attention is in v0.1.0

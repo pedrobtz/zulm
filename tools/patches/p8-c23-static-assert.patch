@@ -1,0 +1,34 @@
+From: Pedro Baltazar <pedrobtz@gmail.com>
+Subject: [PATCH P8] ggml : do not define static_assert as a macro in C23
+
+Upstream pull request: (not opened yet; see design §9.3)
+
+In C23 static_assert is a keyword, so the fallback macro in
+ggml-common.h and ggml-impl.h is not needed, and defining it hides the
+keyword: clang 22 and 23 warn "keyword is hidden by macro definition
+[-Wkeyword-macro]" when C is compiled as -std=gnu23, which R's
+r-devel-linux-x86_64-debian-clang check flavour does. Skip the macro
+when __STDC_VERSION__ is C23 or later.
+
+--- a/src/ggml-common.h
++++ b/src/ggml-common.h
+@@ -74,7 +74,7 @@
+ #if defined(GGML_COMMON_DECL)
+ 
+ #ifndef __cplusplus
+-#ifndef static_assert
++#if !defined(static_assert) && !(defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L)
+ #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201100L)
+ #define static_assert(cond, msg) _Static_assert(cond, msg)
+ #else
+--- a/src/ggml-impl.h
++++ b/src/ggml-impl.h
+@@ -48,7 +48,7 @@
+ // if C99 - static_assert is noop
+ // ref: https://stackoverflow.com/a/53923785/4039976
+ #ifndef __cplusplus
+-    #ifndef static_assert
++    #if !defined(static_assert) && !(defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L)
+         #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201100L)
+             #define static_assert(cond, msg) _Static_assert(cond, msg)
+         #else
