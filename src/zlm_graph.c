@@ -72,6 +72,12 @@ static void graph_free(zlm_graph *g) {
   free(g->node_c);
   for (int i = 0; i < g->n_aux; i++) free(g->aux[i]);
   free(g->aux);
+  for (int i = 0; i < g->n_const; i++) {
+    if (g->cbuf[i]) ggml_backend_buffer_free(g->cbuf[i]);
+    if (g->cctx[i]) ggml_free(g->cctx[i]);
+  }
+  free(g->cctx);
+  free(g->cbuf);
   free(g);
 }
 
@@ -435,6 +441,8 @@ static void op_body(void *data) {
     r = ggml_mul_mat(ctx, cont(ctx, a), cont(ctx, b));
   } else if (strcmp(op, "reshape") == 0) {
     r = ggml_reshape_4d(ctx, cont(ctx, a), j->ip[0], j->ip[1], j->ip[2], j->ip[3]);
+  } else if (strcmp(op, "repeat") == 0) {
+    r = ggml_repeat_4d(ctx, cont(ctx, a), j->ip[0], j->ip[1], j->ip[2], j->ip[3]);
   } else if (strcmp(op, "permute") == 0) {
     r = ggml_permute(ctx, a, j->ip[0], j->ip[1], j->ip[2], j->ip[3]);
   } else if (strcmp(op, "transpose") == 0) {
@@ -546,8 +554,21 @@ static void validate(zlm_opjob *j, SEXP call) {
       shape_error(call, op, a, NULL, "n_dims must be even and at most the first dimension");
     return;
   }
+  if (strcmp(op, "reshape") == 0 && a->type == GGML_TYPE_I32) {
+    /* an index input may be reshaped (a view): zl_embedding() flattens */
+    int64_t n = (int64_t) j->ip[0] * j->ip[1] * j->ip[2] * j->ip[3];
+    if (n != n_el(a)) shape_error(call, op, a, NULL, "the new dimensions hold a different number of elements");
+    return;
+  }
   need_f32(op, a);
   need_f32(op, b);
+  if (strcmp(op, "repeat") == 0) {
+    for (int k = 0; k < GGML_MAX_DIMS; k++) {
+      if (j->ip[k] < 1 || j->ip[k] % a->ne[k] != 0)
+        shape_error(call, op, a, NULL, "each new dimension must be a multiple of x's");
+    }
+    return;
+  }
   if (strcmp(op, "add") == 0 || strcmp(op, "mul") == 0 || strcmp(op, "sub") == 0 ||
       strcmp(op, "div") == 0) {
     if (!can_repeat(b, a) && !can_repeat(a, b))
@@ -597,9 +618,12 @@ SEXP zlm_op(SEXP gptr, SEXP op, SEXP ha, SEXP hb, SEXP num, SEXP ints, SEXP call
   for (int i = 0; i < (int) Rf_xlength(ints) && i < 8; i++) j.ip[i] = INTEGER(ints)[i];
   if (!unchecked) validate(&j, call);
   if (strcmp(j.op, "get_rows") == 0) {
-    /* the index must be an input, so zl_forward() can check its range */
+    /* the index must be an input, or a reshape of one, so zl_forward()
+       can check its range */
+    const struct ggml_tensor *base = j.b;
+    while (base->view_src != NULL) base = base->view_src;
     int found = 0;
-    for (int i = 0; i < g->n_in; i++) found |= g->in[i] == j.b;
+    for (int i = 0; i < g->n_in; i++) found |= g->in[i] == base;
     if (!found) {
       zlm_raise("zulm_invalid_argument", R_NilValue, "zl_get_rows() takes an index that is a graph input.");
     }
@@ -627,7 +651,9 @@ SEXP zlm_op(SEXP gptr, SEXP op, SEXP ha, SEXP hb, SEXP num, SEXP ints, SEXP call
       g->checks = c;
       g->cap_checks = cap;
     }
-    g->checks[g->n_checks].idx = j.b;
+    const struct ggml_tensor *base = j.b;
+    while (base->view_src != NULL) base = base->view_src;
+    g->checks[g->n_checks].idx = (struct ggml_tensor *) base;
     g->checks[g->n_checks].bound = j.a->ne[1];
     g->n_checks++;
   }
@@ -720,6 +746,43 @@ SEXP zlm_rowloss_get(SEXP rlptr) {
     zlm_raise("zulm_stale_error", R_NilValue, "This graph is no longer valid.");
   }
   return Rf_ScalarReal(zlm_rowloss_value(rl));
+}
+
+/* A constant tensor of f32 values with dims (4 numbers), owned by the
+   graph: an allocated leaf, so every copy of the graph reads it. */
+SEXP zlm_const(SEXP gptr, SEXP values, SEXP dims) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  if (g->state != ZLM_GRAPH_BUILDING) {
+    zlm_raise("zulm_invalid_argument", R_NilValue, "Constants are made inside build() only.");
+  }
+  int64_t ne[4];
+  for (int k = 0; k < 4; k++) ne[k] = (int64_t) REAL(dims)[k];
+  if (g->n_const == g->cap_const) {
+    int cap = g->cap_const ? 2 * g->cap_const : 8;
+    struct ggml_context **c = (struct ggml_context **) realloc(g->cctx, (size_t) cap * sizeof *c);
+    if (c == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+    g->cctx = c;
+    ggml_backend_buffer_t *b = (ggml_backend_buffer_t *) realloc(g->cbuf, (size_t) cap * sizeof *b);
+    if (b == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+    g->cbuf = b;
+    g->cap_const = cap;
+  }
+  struct ggml_init_params ip = { 2 * ggml_tensor_overhead(), NULL, true };
+  struct ggml_context *ctx = ggml_init(ip);
+  if (ctx == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+  struct ggml_tensor *t = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
+  ggml_set_name(t, "const");
+  ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, ggml_backend_cpu_buffer_type());
+  if (buf == NULL) {
+    ggml_free(ctx);
+    zlm_raise("zulm_memory_error", R_NilValue, "Out of memory allocating a constant.");
+  }
+  g->cctx[g->n_const] = ctx;
+  g->cbuf[g->n_const] = buf;
+  g->n_const++;
+  float *d = (float *) t->data;
+  for (int64_t i = 0; i < ggml_nelements(t); i++) d[i] = (float) REAL(values)[i];
+  return tensor_wrap(gptr, t);
 }
 
 /* ---- finishing and running ------------------------------------------ */

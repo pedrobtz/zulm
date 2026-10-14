@@ -71,6 +71,7 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_noise", (DL_FUNC) &zlm_noise, 6},
   {"zlm_rowloss_op", (DL_FUNC) &zlm_rowloss_op, 6},
   {"zlm_rowloss_get", (DL_FUNC) &zlm_rowloss_get, 1},
+  {"zlm_const", (DL_FUNC) &zlm_const, 3},
   {NULL, NULL, 0}
 };
 
