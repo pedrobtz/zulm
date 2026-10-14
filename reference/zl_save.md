@@ -3,14 +3,15 @@
 `zl_save()` writes every parameter of a store, and optional metadata, to
 a GGUF file, the format of the 'ggml' library, which other tools
 (llama.cpp, the 'gguf' Python package) read. `zl_load()` reads one into
-a new store, with every tensor in single precision.
+a new store, with every tensor in single precision unless `keep_types`
+is `TRUE`.
 
 ## Usage
 
 ``` r
 zl_save(p, path, type = c("f32", "f16", "bf16"), metadata = list())
 
-zl_load(path)
+zl_load(path, keep_types = FALSE)
 ```
 
 ## Arguments
@@ -33,6 +34,13 @@ zl_load(path)
   A named list of key-value pairs to store with the tensors: each value
   a character, integer, double or logical vector without `NA`. Keys
   starting with `zulm.` are reserved.
+
+- keep_types:
+
+  For `zl_load()`: `FALSE` widens every tensor to f32; `TRUE` keeps f16
+  and bf16 tensors in their type in memory (see
+  [`zl_params()`](https://pedrobtz.github.io/zulm/reference/zl_params.md)
+  for the cost in precision).
 
 ## Value
 

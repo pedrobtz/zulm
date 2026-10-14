@@ -65,7 +65,7 @@ when the store is garbage collected. Stores cannot be saved with
 <span></span>
 <span><span class="fu">zl_param_set</span><span class="op">(</span><span class="va">p</span>, <span class="va">name</span>, <span class="va">value</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">zl_param_names</span><span class="op">(</span><span class="va">p</span><span class="op">)</span></span>
+<span><span class="fu">zl_param_names</span><span class="op">(</span><span class="va">p</span>, types <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">zl_param_count</span><span class="op">(</span><span class="va">p</span><span class="op">)</span></span>
 <span></span>
@@ -102,6 +102,11 @@ the store.</p></dd>
 dimensions, or a vector of the right length for a one-dimensional
 parameter. <code>NA</code> is refused.</p></dd>
 
+
+<dt id="arg-types">types<a class="anchor" aria-label="anchor" href="#arg-types"></a></dt>
+<dd><p>For <code>zl_param_names()</code>: <code>TRUE</code> returns the parameters'
+storage types, named by parameter.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -118,6 +123,11 @@ added; <code>zl_param_count()</code> the total number of values;
 precision, for weights that are only read). R doubles are rounded to
 the nearest representable value; values beyond the type's range become
 infinite with a <code>zulm_range_warning</code>.</p>
+<p>Half precision costs more than storage: 'ggml' converts the activations
+to the weight's type before a product, so <code><a href="zl-shape.html">zl_crossprod()</a></code> with an f16
+weight differs from the f32 product by about 1e-3 of the output's
+scale, and with a bf16 weight by about 2e-3 to 3e-3. Results that must
+match a reference closely need f32 weights.</p>
 <p>An R array of <code>dim = c(d1, d2, d3, d4)</code> is stored with the first index
 fastest, as R stores it, so values move without reordering.</p>
     </div>

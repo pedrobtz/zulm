@@ -26,14 +26,14 @@ decides.
 
 ## Current state
 
-Verified 2026-10-14: Stage 7 of the roadmap. ggml v0.26.0’s CPU subset
+Verified 2026-10-14: Stage 8 of the roadmap. ggml v0.26.0’s CPU subset
 is vendored and builds as CPU-dispatched variants (Stage 1). Stores and
 GGUF (Stage 2), graphs and operations (Stage 3), training through
 `ggml-opt` (Stage 4), zurand draws with fixed-order loss sums (Stage 5),
-modules and PyTorch fixtures (Stage 6), and one persistent,
-interruptible, fork-safe thread pool (Stage 7) exist; safetensors come
-in Stage 8. Patches P1, P2, P7, P8, P9 and P10 are vendored; none has an
-upstream pull request yet (design §9.3).
+modules and PyTorch fixtures (Stage 6), the thread pool (Stage 7), and
+safetensors with f16 and bf16 weights (Stage 8) exist; state tensors
+come in Stage 9. Patches P1, P2, P7, P8, P9 and P10 are vendored; none
+has an upstream pull request yet (design §9.3).
 
 ## Stage tracking
 

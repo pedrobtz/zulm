@@ -148,6 +148,10 @@ pak::pak("pedrobtz/zulm")
 - [`zl_rng_uniform()`](https://pedrobtz.github.io/zulm/reference/zl_rng_uniform.md)
   [`zl_rng_normal()`](https://pedrobtz.github.io/zulm/reference/zl_rng_uniform.md)
   : Random draws, in R
+- [`zl_safetensors_read()`](https://pedrobtz.github.io/zulm/reference/zl_safetensors_read.md)
+  [`zl_load_safetensors()`](https://pedrobtz.github.io/zulm/reference/zl_safetensors_read.md)
+  [`zl_save_safetensors()`](https://pedrobtz.github.io/zulm/reference/zl_safetensors_read.md)
+  : safetensors files
 - [`zl_save()`](https://pedrobtz.github.io/zulm/reference/zl_save.md)
   [`zl_load()`](https://pedrobtz.github.io/zulm/reference/zl_save.md) :
   Save and load parameters as GGUF

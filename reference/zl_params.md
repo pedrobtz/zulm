@@ -25,7 +25,7 @@ zl_param_get(p, name)
 
 zl_param_set(p, name, value)
 
-zl_param_names(p)
+zl_param_names(p, types = FALSE)
 
 zl_param_count(p)
 
@@ -62,6 +62,11 @@ zl_param_tensor(p, name)
   vector of the right length for a one-dimensional parameter. `NA` is
   refused.
 
+- types:
+
+  For `zl_param_names()`: `TRUE` returns the parameters' storage types,
+  named by parameter.
+
 ## Value
 
 `zl_params()` returns an empty store. `zl_param()` and `zl_param_set()`
@@ -77,6 +82,13 @@ handle for use when building a graph.
 precision, for weights that are only read). R doubles are rounded to the
 nearest representable value; values beyond the type's range become
 infinite with a `zulm_range_warning`.
+
+Half precision costs more than storage: 'ggml' converts the activations
+to the weight's type before a product, so
+[`zl_crossprod()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md)
+with an f16 weight differs from the f32 product by about 1e-3 of the
+output's scale, and with a bf16 weight by about 2e-3 to 3e-3. Results
+that must match a reference closely need f32 weights.
 
 An R array of `dim = c(d1, d2, d3, d4)` is stored with the first index
 fastest, as R stores it, so values move without reordering.
