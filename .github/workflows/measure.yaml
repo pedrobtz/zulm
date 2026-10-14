@@ -80,6 +80,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p ~/.R
+          # Windows reads ~/.R/Makevars.win, the others ~/.R/Makevars.
           echo 'CPPFLAGS += -DGGML_USE_LLAMAFILE' >> ~/.R/Makevars
+          echo 'CPPFLAGS += -DGGML_USE_LLAMAFILE' >> ~/.R/Makevars.win
           R CMD INSTALL --preclean . > install-llamafile.log 2>&1 || { tail -50 install-llamafile.log; exit 1; }
           Rscript tools/bench-variants.R llamafile

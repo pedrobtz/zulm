@@ -2,7 +2,7 @@
 repository: https://github.com/ggml-org/ggml
 tag: v0.26.0
 commit: d7cb574130e6f01ad25b3289685489200febcd74
-patch: (none)
+patch: p8-c23-static-assert.patch
 stripped: src/ggml-cpu/amx/mmq.cpp:2:#pragma GCC diagnostic ignored "-Wpedantic"
 stripped: src/ggml-cpu/amx/mmq.cpp:3:#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 stripped: src/ggml-cpu/arch/arm/repack.cpp:22:#pragma GCC diagnostic ignored "-Woverlength-strings"
@@ -24,7 +24,7 @@ e56714aab702e5ce62ee587a409643c08f7e93e8fbb77f48ef7cc85075f96fa4  include/gguf.h
 4e861c8e23d3d7b0d99d8e0836e68564af58f8597d75d7bbb732857d7a632fa7  src/ggml-backend-impl.h
 f459c44d86a19a7c7be01663f2bcaf64f6b9dc486f28b10e8eba13328c82299f  src/ggml-backend-meta.cpp
 cdb79f2937aa147084a76f949adc0eb760ad1883e0ccc015bb4e0f599c89bd5f  src/ggml-backend.cpp
-0061131b615c5721fc88a78feeb22c1f8c450f1c2646a317d80796a653bf595c  src/ggml-common.h
+5cd52974ca74e15ec9a8a4bf9ad98be844fb8478bc73ab42c64e7f618b9189a4  src/ggml-common.h
 0d1641ce16917e3f6260ff74523b158bb823599bbf76cbf9aedcc9d365de84d4  src/ggml-cpu/amx/amx.cpp
 9d098ceee6a8114d4a660ff269064a27aa25b8a4f205d1e6984d17bec5104f0d  src/ggml-cpu/amx/amx.h
 c694f6bb066a820b717f986914b0d112dca0d8d3a1e239e958fce30c864751c3  src/ggml-cpu/amx/common.h
@@ -66,12 +66,12 @@ e63b382766f1b8c5ded1577be9704e85cb4e9cd24584f3e1474911a40146df33  src/ggml-cpu/u
 31e43ec66a1e2920a549dd2f71e6ce474e68f2fc298c4d2942404ca327e763d1  src/ggml-cpu/vec.cpp
 885a50e405f20f75ea70cb7fb062934812beffc9229ddb56a003aa150163d2fa  src/ggml-cpu/vec.h
 4490179fd8c6df80fe29fc602ed7236eb828c51e9c379efb0dd510cb5cb81fec  src/ggml-feats.h
-43564db0238aebb7ed68501e346c194866b5dac218d1d37b26baff9f458c00d3  src/ggml-impl.h
+c11596c58c05260b14c748a32b17ef71ef556ec29590cfd89c5e52316cb9302f  src/ggml-impl.h
 e35fd27856e37f3611d3bc6f17ee963be51bfe92bec96fad0a9fa2c7ebbe9c46  src/ggml-opt.cpp
 5574a2dccf7c07e75b143733e04a5412d3d8c819e7945f5217a7b83a2b2ff8ab  src/ggml-quants.c
 28ae5fca1f3be636b36cd6c4fa2ca74fd42d229bfbd5352eaf66f3727bb8a6da  src/ggml-quants.h
 13a18d885393722b7c9f42d4cf8575a4d41699926d656f78a867fa4fac9dad20  src/ggml-threading.cpp
 9652729043ed91482392c1aa08af5d813190d0ace2e7982d2539d28240ab8d8b  src/ggml-threading.h
-e54f304d0e38bc50d51ab162589b1705568aae5252504dbabc867c4c70129252  src/ggml-version.h
+44e4d8364d53267dd2e4bf012abe31432a92d342e65f166ba61df414e0bd490d  src/ggml-version.h
 7e8bf2b60598b50d718f46aa3c36c9293b10f4e7dfde6844f0693e6fc976d505  src/ggml.c
 7505d6a434dc740941a682fd3b476ef9bd9893ab76adf18c9969daa528bd5be5  src/gguf.cpp
