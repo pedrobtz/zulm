@@ -9,7 +9,7 @@
   `ggmlR` and, for the packages that build on it, to `torch`; this
   design does not reopen either decision.
 - **Revisions.** 2026-10-10, after review of the RFC: CRAN's x86-64
-  macOS binaries make clang a Stage 0 blocker (§13.1); upstream's
+  macOS binaries make clang a Stage 1 blocker (§13.1); upstream's
   diagnostic pragmas need stripping for `--as-cran` (§9.2); gradient
   clipping needs patch P7 (§9.3); inputs live in a static buffer (§4);
   Arrow batches, safetensors, spectra and the `zuexact` lookup left
@@ -389,7 +389,7 @@ had cut v0.1.0 to the §1.1 model and the determinism contract. The
 maintainer's decision of 2026-10-14 (D27) is that zulm reaches CRAN
 once with everything zuflow 0.1.0 and zukzeit 0.1.0 need, rather than
 in three releases that each consumer would have to wait for. The
-cost is in §14: thirteen stages instead of nine.
+cost is in §14 and the roadmap: fifteen stages instead of nine.
 
 **In 0.2** (approved in RFC 0031 and unchanged; needed by neither
 consumer's first release, so they wait):
@@ -937,7 +937,7 @@ the ISA variant, because a result is reproducible only within one.
   `ggml_backend_cpu_set_threadpool`), recreated when the size changes.
   Without one, ggml creates and joins a disposable pool on every graph
   computation. Polling (`poll`) starts at 0, which makes idle workers
-  sleep rather than spin; Stage 6 measures its cost against ggml's
+  sleep rather than spin; Stage 7 measures its cost against ggml's
   default of 50.
 - Oversubscription is severe with ggml's hybrid spinning: four threads
   on the two-core drafting machine ran the §1.1 step more than seven
@@ -998,7 +998,7 @@ leaves the training path untouched.
   requires and `q`, `k`, `v` in upstream's layouts (`[d, n, heads,
   batch]`, `v` not transposed). It holds no score matrix, so the 10 240
   -event contexts of §1.1's evaluation (§17) attend in memory linear in
-  the context. Stage 9 checks its agreement with the plain
+  the context. Stage 10 checks its agreement with the plain
   form within f32 tolerance, and whether its kernel is thread-invariant
   (§17), before any consumer graph uses it; the plain form stays the
   reference and the training path.
@@ -1083,7 +1083,7 @@ custom operation writes one value per row, each row on one thread, and
 the shim adds the rows on the main thread after the computation. The
 custom node has no gradient (it is not an ancestor of the loss), so
 `ggml_compute_backward` returns early for it and no ggml patch is
-needed; Stage 4 confirms this in `ggml-opt`'s graph duplication.
+needed; Stage 5 confirms this in `ggml-opt`'s graph duplication.
 
 The adding is `zuexact_api_v1` when `zuexact` is installed (`acc_size`,
 `init`, `addv`, `round` from RFC 0023 §7; f32 values widen to `double`
@@ -1614,7 +1614,7 @@ now.
   scale of `min(1, clip / norm)` applied to each gradient the step
   reads. Those nodes are `SQR`, `SUM` and `SCALE`, whose kernels are
   thread-invariant (§6.5), so clipping keeps the determinism contract.
-  Until P7 is vendored (Stage 3), `zl_trainer(clip_norm =)` with a
+  Until P7 is vendored (Stage 4), `zl_trainer(clip_norm =)` with a
   non-`NULL` value is `zulm_invalid_argument` naming the patch, not
   a silent no-op. Clipping is a feature upstream's own training
   examples lack and a plausible contribution; if upstream declines, the
@@ -1832,7 +1832,7 @@ Options:
    objects in one library (a shared inline function compiled for AVX2
    chosen by the linker for baseline code) cannot arise. Proposed
    variants: on x86-64, `baseline`, `sse42` and `avx2` (with FMA, F16C,
-   BMI2), and `avx512` if Stage 0 shows a gain over `avx2` for f32
+   BMI2), and `avx512` if Stage 1 shows a gain over `avx2` for f32
    training; on arm64, one (NEON is in the base ABI).
 
 How a variant gets its ISA. Per-file `-mavx2` style flags work, but R's
@@ -1883,12 +1883,12 @@ Stage 1 (RFC 0026 §12.3), even though the install-log scan would let
 `-funroll-loops` through. It is requested in the source instead:
 `#pragma GCC optimize("unroll-loops")` in the force-included header,
 beside the target pragma, for GCC; clang has no file-level unrolling
-pragma but unrolls at `-O2` by default, so Stage 0 measures whether a
+pragma but unrolls at `-O2` by default, so Stage 1 measures whether a
 clang build already has the gain. Whether llamafile's kernels keep
-results independent of the thread count is unverified; Stage 0
+results independent of the thread count is unverified; Stage 1
 measures it before either is adopted.
 
-Stage 0 must show, before anything else is written: the variant build
+Stage 1 must show, before anything else is written: the variant build
 on the Linux, Windows, arm64 macOS and **x86-64 macOS** CI legs with
 `R CMD check --as-cran` free of the non-portable-flag NOTE and of the
 pragma NOTE (§9.2); `.onLoad` choosing the right variant on each
@@ -1937,7 +1937,7 @@ zulm's design, in order of reliance:
    GCC unwinds with SEH rather than DWARF, and C frames need the same
    `-fexceptions` to carry unwind tables; whether a throw from the
    abort callback crosses `ggml_abort`'s C frames there is unverified
-   and is a Stage 0 item beside the threading check (§13.3). If it
+   and is a Stage 1 item beside the threading check (§13.3). If it
    does not, the fallback on Windows is prevention alone (layer 1),
    with the assertion message reaching the crash log.
 3. **The fatal path.** An assertion during a computation cannot be
@@ -1969,7 +1969,7 @@ submission comments say so plainly rather than hiding the symbol.
   (`CXX_STD = CXX17`); no OpenMP (ggml's own pool is used; upstream's
   OpenMP path also calls `setenv("KMP_BLOCKTIME")`); no system
   libraries; `SystemRequirements: GNU make` if the variant build of
-  §13.4 needs pattern rules or conditionals, which Stage 0 settles.
+  §13.4 needs pattern rules or conditionals, which Stage 1 settles.
 - Warnings: the CPU-only sources gave 231 warnings under
   `-Wall -Wextra -pedantic`, all `-Wunused-function`, 220 of them from
   `static` helpers in `ggml-impl.h` repeated per file. Upstream builds
@@ -1987,7 +1987,7 @@ submission comments say so plainly rather than hiding the symbol.
   MinGW honours for `__declspec`-less symbols) on Windows. Each exports
   only `R_init_zulm` (and `R_init_` of each variant). In the
   drafting build the Linux version script left one dynamic symbol;
-  Stage 0 audits all three with `nm -D`, `nm -gU` and `objdump -p`.
+  Stage 1 audits all three with `nm -D`, `nm -gU` and `objdump -p`.
 - `getenv()` reads only debugging switches (`GGML_SCHED_DEBUG`,
   `GGML_META_DEBUG`, `GGML_NO_BACKTRACE`) and `GGML_CPU_DISABLE_FUSION`,
   which changes kernel fusion and so possibly bits; `zulm_info()`
@@ -1996,7 +1996,7 @@ submission comments say so plainly rather than hiding the symbol.
 - Windows: ggml's CPU backend has its own Win32 threading layer; whether
   it is reliable under Rtools' MinGW GCC, and whether the §13.2
   exception crosses C frames under SEH, are unverified and part of
-  Stage 0. macOS: unverified beyond reading the source, on both
+  Stage 1. macOS: unverified beyond reading the source, on both
   architectures (§13.1).
 
 ### 13.4 Makevars and the native build hook
@@ -2023,7 +2023,7 @@ as read in R's `check.R`:
 - **R's flags come last**, so an optimisation level in `PKG_*FLAGS` is
   overridden by the site's `-O2`; zulm sets none.
 
-The file, in outline (Stage 0 writes the real one and records it here):
+The file, in outline (Stage 1 writes the real one and records it here):
 
 ```make
 # src/Makevars (design §13.4)
@@ -2065,7 +2065,7 @@ install.packages("zulm", type = "source")
   against CRAN's binaries.
 - **Not on Windows.** `Makevars.win` carries no hook, as zufft's does
   not, because AVX code from Rtools' MinGW-w64 GCC crashed on load in
-  zufft's CI (§13.1). If Stage 0 shows ggml's AVX2 code loads under
+  zufft's CI (§13.1). If Stage 1 shows ggml's AVX2 code loads under
   Rtools, the hook is added to `Makevars.win` then, with the reason
   recorded here.
 - **Checked in CI**, with zufft's two workflows carried over through
@@ -2085,34 +2085,41 @@ install.packages("zulm", type = "source")
 
 ## 14. Roadmap
 
+The stages are kept in `roadmap.md`, which holds each stage's work and
+exit criteria and is authoritative; this table is the summary. The
+numbering follows the roadmap: Stage 0 is package identity alone, and
+the vendoring go/no-go is Stage 1.
+
 | Stage | Title | Size |
 | --- | --- | --- |
-| 0 | Identity; vendor scripts (pragma strip); P1, P2, P7 upstream; §13.1 on GCC and clang; symbols on three platforms | L |
-| 1 | Tensors, types, store, GGUF | M |
-| 2 | Graphs, operations (including the forward-only set and both rotary conventions, §5.3), forward, validation, §13.2 recovery | L |
-| 3 | Backward pre-check, trainer, optimisers, P7 clipping, gradient checks | M |
-| 4 | zurand in graphs (§7.2); per-row loss sums with the fixed-order fallback | S |
-| 5 | Modules; the §1.1 model end to end; sampling; GGUF fixtures from PyTorch, including the two §1.2 blocks | M |
-| 6 | Thread pool, polling, interrupts, fork, determinism tests | M |
-| 7 | safetensors through `zujson`; f16 and bf16 weights in memory, `zl_cast()`, the precision test | M |
-| 8 | State tensors, `set_rows`, the graph cache; the decode-loop test; `input_write_f32_at` | M |
-| 9 | Flash attention forward-only: mask format, agreement with the plain form, thread-count measurement | S |
-| 10 | Arrow iterator and `batch_fill`, with nanoarrow, DuckDB and Parquet fixtures | M |
-| 11 | The C table, `zulm.h`, a fixture consumer; zukzeit's Toto 2.0 4M on zulm in a zukzeit branch, parity green | M |
-| 12 | Fuzzing, benchmarks (training and inference), documentation, 0.1.0 | M |
+| 0 | Package identity | S |
+| 1 | Vendored ggml and the CPU-dispatch go/no-go: vendor script (pragma strip); P1, P2, P7 upstream; §13.1 on GCC and clang; §13.4 Makevars; symbols on three platforms | L |
+| 2 | Tensors, types, store, GGUF | M |
+| 3 | Graphs, operations (including the forward-only set and both rotary conventions, §5.3), forward, validation, §13.2 recovery | L |
+| 4 | Backward pre-check, trainer, optimisers, P7 clipping, gradient checks | M |
+| 5 | zurand in graphs (§7.2); per-row loss sums with the fixed-order fallback | S |
+| 6 | Modules; the §1.1 model end to end; sampling; GGUF fixtures from PyTorch, including the two §1.2 blocks | M |
+| 7 | Thread pool, polling, interrupts, fork, determinism tests | M |
+| 8 | safetensors through `zujson`; f16 and bf16 weights in memory, `zl_cast()`, the precision test | M |
+| 9 | State tensors, `set_rows`, the graph cache; the decode-loop test; `input_write_f32_at` | M |
+| 10 | Flash attention forward-only: mask format, agreement with the plain form, thread-count measurement | S |
+| 11 | Arrow iterator and `batch_fill`, with nanoarrow, DuckDB and Parquet fixtures | M |
+| 12 | The C table, `zulm.h`, a fixture consumer; zukzeit's Toto 2.0 4M on zulm in a zukzeit branch, parity green | M |
+| 13 | Fuzzing, benchmarks (training and inference), documentation | M |
+| 14 | v0.1.0 readiness | S |
 
-Stages 0 to 6 are the training substrate, 7 to 10 the inference and
-data pieces the two consumers need, and 11 the proof that both can
+Stages 1 to 7 are the training substrate, 8 to 11 the inference and
+data pieces the two consumers need, and 12 the proof that both can
 build on the result: a fixture consumer for zuflow's pattern of use,
 and zukzeit's smallest certified checkpoint running on zulm from a
 branch of zukzeit, which is where the fixtures live. TimesFM 2.5 and
 Chronos-2 are ported in zukzeit after zulm's release, on zukzeit's
 roadmap; zulm's own gate for them is the TimesFM-style decode test of
-Stage 8 and the §1.2 block fixtures of Stage 5.
+Stage 9 and the §1.2 block fixtures of Stage 6.
 
 **0.2**, in order: `zuexact` lookup (S), spectra with P6 upstream (S),
 `argsort` and `top_k` if asked (S). RFC 0032's dependency on "zuggml's
-Stages 5 and 9" reads zulm's Stages 5 and 11.
+Stages 5 and 9" reads zulm's Stages 6 and 12.
 
 ## 15. Acceptance criteria for v0.1.0
 
@@ -2244,25 +2251,25 @@ regrouping; `zl_spectrum()` agrees with `zufft` and `stats::fft()`.
    transformer block and AdaLN.
 7. **Variants and kernels.** Is `avx512` worth a fourth x86-64 variant,
    and should the AVX2 variant use llamafile kernels or the unrolling
-   pragma of §13.1, or both? Recommended: decide from Stage 0's
+   pragma of §13.1, or both? Recommended: decide from Stage 1's
    measurements of training steps and thread-count determinism, not
    from matrix products alone.
 8. **Long contexts.** The post evaluates on 10 240-event contexts; plain
    attention then holds a 10 240² score matrix (419 MB in f32) per head
    and sequence. Upstream's forward-only flash attention is in v0.1.0
-   (§6.9, Stage 9) for sampling and inference graphs. Neither
+   (§6.9, Stage 10) for sampling and inference graphs. Neither
    consumer's first release strictly needs it (the §1.1 model trains
    at 64 events, the foundation models attend over at most 512
-   patches), so if Stage 9's measurement finds it thread-dependent or
+   patches), so if Stage 10's measurement finds it thread-dependent or
    the mask format costly, it may ship disabled by default with the
    plain form as the reference, rather than hold the release.
 9. **Two members for zurand.** **Asked 2026-10-14:**
    [zurand#63](https://github.com/pedrobtz/zurand/issues/63)
    (`fold_bytes()`) and
    [zurand#64](https://github.com/pedrobtz/zurand/issues/64) (f32
-   fills). zulm's Stage 4 does not wait for them: until they exist,
+   fills). zulm's Stage 5 does not wait for them: until they exist,
    names are folded in R and the f32 rounding rule is zulm's (§7.2).
-   When they land, Stage 4 or a later patch switches to them with a
+   When they land, Stage 5 or a later patch switches to them with a
    test that the bits are unchanged.
 10. **`zuexact` as a hard dependency?** Recommended: no; the fallback
     already meets the thread contract, and exactness under regrouping is
@@ -2297,7 +2304,7 @@ regrouping; `zl_spectrum()` agrees with `zufft` and `stats::fft()`.
 16. **Flash attention and determinism.** Whether
     `ggml_flash_attn_ext`'s CPU kernel gives the same bits at every
     thread count is unmeasured; the plain form does (§6.5).
-    Recommended: measure in Stage 9; if it does not, graphs that use
+    Recommended: measure in Stage 10; if it does not, graphs that use
     it carry a documented exception to §6.5 above one thread, and
     zukzeit's parity runs stay on the plain form.
 17. **The graph cache: R or C?** §6.9 keeps it an R environment.
