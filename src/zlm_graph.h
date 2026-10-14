@@ -48,6 +48,12 @@ typedef struct zlm_graph {
   int *node_c;
   int n_node, cap_node, n_calls;
   struct ggml_tensor *last_seen;
+  /* the step zurand draws in this graph use (design §7.2): the trainer's
+     count of steps, 0 before training */
+  int64_t step;
+  /* memory the graph's custom operations point to, freed with it */
+  void **aux;
+  int n_aux, cap_aux;
   int state;
   int threads;
   double max_bytes, bytes_inputs, bytes_compute;
@@ -81,6 +87,9 @@ SEXP zlm_graph_info(SEXP gptr);
 SEXP zlm_graph_call_of(SEXP gptr, struct ggml_tensor *t);
 void zlm_graph_check_indices(zlm_graph *g);
 SEXP zlm_graph_output(SEXP gptr, SEXP index);
+SEXP zlm_noise(SEXP gptr, SEXP key, SEXP dist, SEXP offset, SEXP dims, SEXP call);
+SEXP zlm_rowloss_op(SEXP gptr, SEXP ha, SEXP hb, SEXP mode, SEXP scale, SEXP call);
+SEXP zlm_rowloss_get(SEXP rlptr);
 SEXP zlm_graph_store_ptr(SEXP gptr);
 int zlm_graph_is_param(const zlm_graph *g, const struct ggml_tensor *t);
 
