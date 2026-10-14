@@ -2,17 +2,21 @@
 
 ## Authors
 
-- **First Last**. Author, maintainer.
+- **Pedro Baltazar**. Author, maintainer, copyright holder.
 
 ## Citation
 
-Last F (2026). *zulm: What the Package Does (One Line, Title Case)*. R
-package version 0.0.0.9000, <https://pedrobtz.github.io/zulm/>.
+Source:
+[`DESCRIPTION`](https://github.com/pedrobtz/zulm/blob/main/DESCRIPTION)
+
+Baltazar P (2026). *zulm: Tensor Graphs, Training and Inference on
+'ggml'*. R package version 0.0.0.9000,
+<https://github.com/pedrobtz/zulm>.
 
     @Manual{,
-      title = {zulm: What the Package Does (One Line, Title Case)},
-      author = {First Last},
+      title = {zulm: Tensor Graphs, Training and Inference on 'ggml'},
+      author = {Pedro Baltazar},
       year = {2026},
       note = {R package version 0.0.0.9000},
-      url = {https://pedrobtz.github.io/zulm/},
+      url = {https://github.com/pedrobtz/zulm},
     }

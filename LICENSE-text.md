@@ -1,4 +1,4 @@
 # License
 
     YEAR: 2026
-    COPYRIGHT HOLDER: zulm authors
+    COPYRIGHT HOLDER: Pedro Baltazar

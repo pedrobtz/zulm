@@ -1,5 +1,6 @@
 # Changelog
 
-## zulm (development version)
+## zulm 0.0.0.9000
 
-- Initial CRAN submission.
+- First development version: the package skeleton and its family
+  conventions. The R interface follows in later stages.

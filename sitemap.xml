@@ -1,10 +1,12 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://pedrobtz.github.io/zulm/404.html</loc></url>
+<url><loc>https://pedrobtz.github.io/zulm/CLAUDE.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/LICENSE-text.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/LICENSE.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/authors.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/index.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/news/index.html</loc></url>
 <url><loc>https://pedrobtz.github.io/zulm/reference/index.html</loc></url>
+<url><loc>https://pedrobtz.github.io/zulm/reference/zulm-package.html</loc></url>
 </urlset>
 
