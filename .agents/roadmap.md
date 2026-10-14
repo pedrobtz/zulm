@@ -27,7 +27,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | 5 | [zurand in graphs and per-row loss sums](#stage-5--zurand-in-graphs-and-per-row-loss-sums) | [#7](https://github.com/pedrobtz/zulm/issues/7) | [#26](https://github.com/pedrobtz/zulm/pull/26) | 2026-10-14 |
 | 6 | [Modules, the driving model and PyTorch fixtures](#stage-6--modules-the-driving-model-and-pytorch-fixtures) | [#8](https://github.com/pedrobtz/zulm/issues/8) | [#27](https://github.com/pedrobtz/zulm/pull/27) | 2026-10-14 |
 | 7 | [Thread pool, interrupts, fork and determinism](#stage-7--thread-pool-interrupts-fork-and-determinism) | [#9](https://github.com/pedrobtz/zulm/issues/9) | [#28](https://github.com/pedrobtz/zulm/pull/28) | 2026-10-14 |
-| 8 | [safetensors and weight types](#stage-8--safetensors-and-weight-types) | [#10](https://github.com/pedrobtz/zulm/issues/10) | | |
+| 8 | [safetensors and weight types](#stage-8--safetensors-and-weight-types) | [#10](https://github.com/pedrobtz/zulm/issues/10) | [#29](https://github.com/pedrobtz/zulm/pull/29) | 2026-10-14 |
 | 9 | [State tensors and the graph cache](#stage-9--state-tensors-and-the-graph-cache) | [#11](https://github.com/pedrobtz/zulm/issues/11) | | |
 | 10 | [Flash attention](#stage-10--flash-attention) | [#12](https://github.com/pedrobtz/zulm/issues/12) | | |
 | 11 | [Arrow batches](#stage-11--arrow-batches) | [#13](https://github.com/pedrobtz/zulm/issues/13) | | |
@@ -457,6 +457,16 @@ and documented.
 - Design §15 criterion 11's f16 clause holds.
 
 **Design.** §6.9 (weight types), §7.4; D13, D22, D35, D36.
+
+**Deviations (2026-10-14).** The libFuzzer target for headers is Stage
+13's, with the other fuzz targets under one harness; this stage has a
+mutation test that corrupts a valid header byte by byte and expects a
+`zulm_file_error` or a clean load every time. Two arguments were added:
+`zl_load(keep_types = TRUE)` keeps a GGUF file's f16 and bf16 tensors in
+their type (by default it still widens, as §6.1 says), and
+`zl_param_names(p, types = TRUE)` reports types; `zulm_info()` reports
+the build, not a store. Measured precision bands: f16 within 2e-4 to
+5e-3 of the output's scale, bf16 within 5e-4 to 1e-2.
 
 ## Stage 9 — State tensors and the graph cache
 

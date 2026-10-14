@@ -19,6 +19,7 @@ import sys
 import numpy as np
 import torch
 from gguf import GGUFWriter
+from safetensors.torch import save_file
 
 torch.manual_seed(20261014)
 DT = torch.float32
@@ -29,6 +30,10 @@ def rows(t):
 
 
 def write(path, tensors, meta):
+    # a safetensors copy of every fixture, as PyTorch users would save it
+    save_file({k: v.detach().to(DT).contiguous() for k, v in tensors.items()},
+              path.replace(".gguf", ".safetensors"),
+              metadata={k: str(v) for k, v in meta.items()})
     w = GGUFWriter(path, "zulm-fixture")
     for k, v in meta.items():
         if isinstance(v, str):
