@@ -34,7 +34,10 @@
 
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.0.0.9000" id="zulm-0009000">zulm 0.0.0.9000<a class="anchor" aria-label="anchor" href="#zulm-0009000"></a></h2>
-<ul><li>First development version: the package skeleton and its family conventions. The R interface follows in later stages.</li>
+<ul><li><p>First development version: the package skeleton and its family conventions. The R interface follows in later stages.</p></li>
+<li><p>Bundles the CPU subset of ‘ggml’ v0.26.0, built once per instruction-set level (<code>baseline</code>, <code>sse42</code> and <code>avx2</code> on x86-64, <code>neon</code> on arm64); the best level the CPU supports is loaded with the package, and <code>options(zulm.variant =)</code> forces another.</p></li>
+<li><p><code><a href="../reference/zulm_info.html">zulm_info()</a></code> reports the bundled ‘ggml’ version, the variant loaded, and the CPU features it was built for.</p></li>
+<li><p>Installing from source with <code>ZULM_CFLAGS</code> and <code>ZULM_CXXFLAGS</code> set builds one variant for the local CPU (not on Windows).</p></li>
 </ul></div>
   </main></div>
 

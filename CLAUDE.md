@@ -26,12 +26,13 @@ decides.
 
 ## Current state
 
-Verified 2026-10-14: Stage 0 of the roadmap (package identity). The
-package is a skeleton with its real `DESCRIPTION`, an empty native
-library that only registers itself, and CI. ggml is not vendored yet and
-no R function exists. Stage 1 is a go/no-go on CPU dispatch for CRAN
-binaries (design §13.1) and may change the design before any R surface
-is written.
+Verified 2026-10-14: Stage 1 of the roadmap. ggml v0.26.0’s CPU subset
+is vendored and builds as CPU-dispatched variants with a clean
+`R CMD check --as-cran` on every r-actions leg;
+[`zulm_info()`](https://pedrobtz.github.io/zulm/reference/zulm_info.md)
+is the only exported function. The R API of design §5 starts in Stage 2.
+Patch drafts P1, P2 and P7 wait in `tools/patches/drafts/`; P8 is
+vendored. None of them has an upstream pull request yet (design §9.3).
 
 ## Stage tracking
 
@@ -85,16 +86,39 @@ air format .                                     # format R sources
 `zurand` is not on CRAN yet: install it from GitHub
 (`pak::pak("pedrobtz/zurand")`) before building.
 
+Native build and vendored tree (occasional):
+
+``` sh
+R CMD INSTALL --preclean .        # always --preclean after editing a header:
+                                  # make does not track header dependencies
+tools/vendor-ggml [TAG]           # re-vendor; tools/vendor-ggml --verify checks
+tools/verify-ggml                 # offline: checksums and no diagnostic pragma
+tools/gen-build                   # after vendoring or adding a glue source
+tools/check-exports <libs dir>    # only R_init_ exported
+Rscript tools/bench-variants.R x  # the 512^3 product on every usable variant
+```
+
+`devtools::load_all()` compiles at `-O0`; never measure speed on it, and
+reinstall with `--preclean` before measuring.
+
 ## Architecture
 
 Design §4 is the reference. In outline, as the stages build it:
 
-- `R/` is the user surface, prefixed `zl_`; `zulm_info()` reports the
-  build. Everything a user calls validates its arguments in R or in the
-  C glue before ggml sees them.
+- `R/` is the user surface, prefixed `zl_`;
+  [`zulm_info()`](https://pedrobtz.github.io/zulm/reference/zulm_info.md)
+  reports the build. Everything a user calls validates its arguments in
+  R or in the C glue before ggml sees them.
 - `src/` holds the C glue (prefix `zlm_`), a small C++ shim that turns
   ggml assertions into R errors (design §13.2), and `src/ggml/`, the
   vendored upstream tree, built once per ISA variant (design §13.1).
+- Variants: `src/zlm_v/<set>/` holds generated wrapper translation units
+  (one per ggml source) that include `zlm_variant_begin.h`, the source
+  and `zlm_variant_end.h`; `configure` appends `src/make/<arch>.mk` to
+  `src/Makevars.in`; `src/install.libs.R` installs every
+  `zulm_<variant>` shared object. `zulm.so` itself is only the CPU
+  probe; `R/load.R` loads the variant and calls its routines through
+  `zlm_call()`.
 - `inst/include/zulm.h` is the public C table, `zulm_api_v1`.
 
 ## Invariants that are easy to break
@@ -104,6 +128,12 @@ Design §4 is the reference. In outline, as the stages build it:
   the shim (design §13.2). A test that reaches an assertion is a bug.
 - **Nothing on a ggml pool thread calls R.** Only the main thread
   touches R objects; errors cross as status codes.
+- **Never write a compiler flag into `Makevars`, never compile a ggml
+  source directly.** Every ggml source goes through a `zlm_v/` wrapper,
+  which is what applies `zlm_compat.h` (no stdio, `abort` or `_Exit` may
+  be linked) and the ISA pragmas. Regenerate with `tools/gen-build`.
+- **A variant’s shared object is never unloaded.** Objects it created
+  are finalised by its code; `R/load.R` keeps every loaded variant.
 - **Results must not depend on the thread count.** Reported losses are
   fixed-order sums of per-row values and random draws come from `zurand`
   under keys, never from a thread-local generator (design §6.5).
@@ -169,9 +199,12 @@ user-facing change also needs a test, roxygen documentation and a
 
 Workflows come from `pedrobtz/r-actions`, pinned to `@v1`:
 `r-cmd-check.yml` (quick on pull requests, full on `main`, full on a
-pull request with the `full-ci` label) and `coverage.yml`, plus the
-pkgdown workflow. Stage 1 adds `build-flags` and `portability`, and the
-native checks once ggml is vendored.
+pull request with the `full-ci` label; plus an x86-64 macOS runner),
+`coverage.yml` and `vendor.yml`, plus the pkgdown workflow. Local
+workflows: `build-flags` (fails on the non-portable-flag, pragma and
+compiled-code NOTEs and on any export besides `R_init_`), `portability`
+(the native hooks), `measure` (the §13.1 numbers, informational) and
+`vendor` (re-vendors the tag and checks the generated build files).
 
 Small edits get a small run. The shared workflows look at the files a
 pull request changes, compared with its merge base:
@@ -185,8 +218,10 @@ pull request changes, compared with its merge base:
 
 ## Vendored native code
 
-ggml’s CPU subset (MIT), pinned at tag `v0.26.0`, arrives in Stage 1
-under `src/ggml/` through `tools/vendor-ggml` (design §9).
+ggml’s CPU subset (MIT), pinned at tag `v0.26.0`, lives under
+`src/ggml/`, written by `tools/vendor-ggml` (design §9), which records
+tag, commit, patches, stripped pragmas and checksums in
+`src/ggml/VERSION`.
 
 - Never edit a file under `src/ggml/`. Changes go in `tools/patches/`,
   each with its reason and its upstream pull request (design §9.3).

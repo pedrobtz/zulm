@@ -43,7 +43,7 @@
 </div>
 <div class="section level2">
 <h2 id="current-state">Current state<a class="anchor" aria-label="anchor" href="#current-state"></a></h2>
-<p>Verified 2026-10-14: Stage 0 of the roadmap (package identity). The package is a skeleton with its real <code>DESCRIPTION</code>, an empty native library that only registers itself, and CI. ggml is not vendored yet and no R function exists. Stage 1 is a go/no-go on CPU dispatch for CRAN binaries (design §13.1) and may change the design before any R surface is written.</p>
+<p>Verified 2026-10-14: Stage 1 of the roadmap. ggml v0.26.0’s CPU subset is vendored and builds as CPU-dispatched variants with a clean <code>R CMD check --as-cran</code> on every r-actions leg; <code><a href="reference/zulm_info.html">zulm_info()</a></code> is the only exported function. The R API of design §5 starts in Stage 2. Patch drafts P1, P2 and P7 wait in <code>tools/patches/drafts/</code>; P8 is vendored. None of them has an upstream pull request yet (design §9.3).</p>
 </div>
 <div class="section level2">
 <h2 id="stage-tracking">Stage tracking<a class="anchor" aria-label="anchor" href="#stage-tracking"></a></h2>
@@ -76,14 +76,24 @@
 <span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::check()'</span>                   <span class="co"># R CMD check</span></span>
 <span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="ex">air</span> format .                                     <span class="co"># format R sources</span></span></code></pre></div>
 <p><code>zurand</code> is not on CRAN yet: install it from GitHub (<code>pak::pak("pedrobtz/zurand")</code>) before building.</p>
+<p>Native build and vendored tree (occasional):</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="ex">R</span> CMD INSTALL <span class="at">--preclean</span> .        <span class="co"># always --preclean after editing a header:</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>                                  <span class="co"># make does not track header dependencies</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="ex">tools/vendor-ggml</span> <span class="pp">[</span><span class="ss">TAG</span><span class="pp">]</span>           <span class="co"># re-vendor; tools/vendor-ggml --verify checks</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="ex">tools/verify-ggml</span>                 <span class="co"># offline: checksums and no diagnostic pragma</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="ex">tools/gen-build</span>                   <span class="co"># after vendoring or adding a glue source</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="ex">tools/check-exports</span> <span class="op">&lt;</span>libs dir<span class="op">&gt;</span>    <span class="co"># only R_init_ exported</span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="ex">Rscript</span> tools/bench-variants.R x  <span class="co"># the 512^3 product on every usable variant</span></span></code></pre></div>
+<p><code>devtools::load_all()</code> compiles at <code>-O0</code>; never measure speed on it, and reinstall with <code>--preclean</code> before measuring.</p>
 </div>
 <div class="section level2">
 <h2 id="architecture">Architecture<a class="anchor" aria-label="anchor" href="#architecture"></a></h2>
 <p>Design §4 is the reference. In outline, as the stages build it:</p>
 <ul><li>
-<code>R/</code> is the user surface, prefixed <code>zl_</code>; <code>zulm_info()</code> reports the build. Everything a user calls validates its arguments in R or in the C glue before ggml sees them.</li>
+<code>R/</code> is the user surface, prefixed <code>zl_</code>; <code><a href="reference/zulm_info.html">zulm_info()</a></code> reports the build. Everything a user calls validates its arguments in R or in the C glue before ggml sees them.</li>
 <li>
 <code>src/</code> holds the C glue (prefix <code>zlm_</code>), a small C++ shim that turns ggml assertions into R errors (design §13.2), and <code>src/ggml/</code>, the vendored upstream tree, built once per ISA variant (design §13.1).</li>
+<li>Variants: <code>src/zlm_v/&lt;set&gt;/</code> holds generated wrapper translation units (one per ggml source) that include <code>zlm_variant_begin.h</code>, the source and <code>zlm_variant_end.h</code>; <code>configure</code> appends <code>src/make/&lt;arch&gt;.mk</code> to <code>src/Makevars.in</code>; <code>src/install.libs.R</code> installs every <code>zulm_&lt;variant&gt;</code> shared object. <code>zulm.so</code> itself is only the CPU probe; <code>R/load.R</code> loads the variant and calls its routines through <code>zlm_call()</code>.</li>
 <li>
 <code>inst/include/zulm.h</code> is the public C table, <code>zulm_api_v1</code>.</li>
 </ul></div>
@@ -93,6 +103,10 @@
 <strong>No ggml assertion may reach <code>abort()</code>.</strong> Arguments ggml asserts on are validated first; what remains is caught by the abort callback and the shim (design §13.2). A test that reaches an assertion is a bug.</li>
 <li>
 <strong>Nothing on a ggml pool thread calls R.</strong> Only the main thread touches R objects; errors cross as status codes.</li>
+<li>
+<strong>Never write a compiler flag into <code>Makevars</code>, never compile a ggml source directly.</strong> Every ggml source goes through a <code>zlm_v/</code> wrapper, which is what applies <code>zlm_compat.h</code> (no stdio, <code>abort</code> or <code>_Exit</code> may be linked) and the ISA pragmas. Regenerate with <code>tools/gen-build</code>.</li>
+<li>
+<strong>A variant’s shared object is never unloaded.</strong> Objects it created are finalised by its code; <code>R/load.R</code> keeps every loaded variant.</li>
 <li>
 <strong>Results must not depend on the thread count.</strong> Reported losses are fixed-order sums of per-row values and random draws come from <code>zurand</code> under keys, never from a thread-local generator (design §6.5).</li>
 </ul></div>
@@ -137,7 +151,7 @@
 </ul></div>
 <div class="section level2">
 <h2 id="continuous-integration">Continuous integration<a class="anchor" aria-label="anchor" href="#continuous-integration"></a></h2>
-<p>Workflows come from <code>pedrobtz/r-actions</code>, pinned to <code>@v1</code>: <code>r-cmd-check.yml</code> (quick on pull requests, full on <code>main</code>, full on a pull request with the <code>full-ci</code> label) and <code>coverage.yml</code>, plus the pkgdown workflow. Stage 1 adds <code>build-flags</code> and <code>portability</code>, and the native checks once ggml is vendored.</p>
+<p>Workflows come from <code>pedrobtz/r-actions</code>, pinned to <code>@v1</code>: <code>r-cmd-check.yml</code> (quick on pull requests, full on <code>main</code>, full on a pull request with the <code>full-ci</code> label; plus an x86-64 macOS runner), <code>coverage.yml</code> and <code>vendor.yml</code>, plus the pkgdown workflow. Local workflows: <code>build-flags</code> (fails on the non-portable-flag, pragma and compiled-code NOTEs and on any export besides <code>R_init_</code>), <code>portability</code> (the native hooks), <code>measure</code> (the §13.1 numbers, informational) and <code>vendor</code> (re-vendors the tag and checks the generated build files).</p>
 <p>Small edits get a small run. The shared workflows look at the files a pull request changes, compared with its merge base:</p>
 <ul><li>
 <strong>Markdown only</strong>, such as <code>README.md</code>, <code>NEWS.md</code> or <code>cran-comments.md</code>, skips every check. Only coverage and the pkgdown site run.</li>
@@ -148,7 +162,7 @@
 </ul></div>
 <div class="section level2">
 <h2 id="vendored-native-code">Vendored native code<a class="anchor" aria-label="anchor" href="#vendored-native-code"></a></h2>
-<p>ggml’s CPU subset (MIT), pinned at tag <code>v0.26.0</code>, arrives in Stage 1 under <code>src/ggml/</code> through <code>tools/vendor-ggml</code> (design §9).</p>
+<p>ggml’s CPU subset (MIT), pinned at tag <code>v0.26.0</code>, lives under <code>src/ggml/</code>, written by <code>tools/vendor-ggml</code> (design §9), which records tag, commit, patches, stripped pragmas and checksums in <code>src/ggml/VERSION</code>.</p>
 <ul><li>Never edit a file under <code>src/ggml/</code>. Changes go in <code>tools/patches/</code>, each with its reason and its upstream pull request (design §9.3).</li>
 <li>
 <strong>CRAN’s compiled-code check applies to vendored code too.</strong> No <code>stdout</code> or <code>stderr</code>, no <code>printf</code>, <code>abort</code> or <code>exit</code> may be linked; upstream’s stdio is redirected to the log buffer and its diagnostic pragmas are stripped (design §9.2).</li>
