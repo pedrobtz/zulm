@@ -22,7 +22,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | 0 | [Package identity](#stage-0--package-identity) | [#2](https://github.com/pedrobtz/zulm/issues/2) | [#19](https://github.com/pedrobtz/zulm/pull/19) | 2026-10-14 |
 | 1 | [Vendored ggml and the CPU-dispatch go/no-go](#stage-1--vendored-ggml-and-the-cpu-dispatch-gono-go) | [#3](https://github.com/pedrobtz/zulm/issues/3) | [#21](https://github.com/pedrobtz/zulm/pull/21) | 2026-10-14 |
 | 2 | [Tensors, types, store and GGUF](#stage-2--tensors-types-store-and-gguf) | [#4](https://github.com/pedrobtz/zulm/issues/4) | [#22](https://github.com/pedrobtz/zulm/pull/22) | 2026-10-14 |
-| 3 | [Graphs, operations, forward and validation](#stage-3--graphs-operations-forward-and-validation) | [#5](https://github.com/pedrobtz/zulm/issues/5) | | |
+| 3 | [Graphs, operations, forward and validation](#stage-3--graphs-operations-forward-and-validation) | [#5](https://github.com/pedrobtz/zulm/issues/5) | | 2026-10-14 |
 | 4 | [Autograd, trainer and optimisers](#stage-4--autograd-trainer-and-optimisers) | [#6](https://github.com/pedrobtz/zulm/issues/6) | | |
 | 5 | [zurand in graphs and per-row loss sums](#stage-5--zurand-in-graphs-and-per-row-loss-sums) | [#7](https://github.com/pedrobtz/zulm/issues/7) | | |
 | 6 | [Modules, the driving model and PyTorch fixtures](#stage-6--modules-the-driving-model-and-pytorch-fixtures) | [#8](https://github.com/pedrobtz/zulm/issues/8) | | |
@@ -241,6 +241,14 @@ and an assertion during construction is a catchable R error.
 - The hostile-input suite for graph construction reaches no assertion.
 
 **Design.** §4, §5.3, §6.1, §6.2, §6.8, §13.2; D6, D10, D30, D37, D38.
+
+**Deviations (2026-10-14).** `zl_gelu()` gained `approximate = c("none",
+"tanh")`, defaulting to the exact form, because ggml's tanh form reads
+an f16 table (design §5.3). Indices count from 0 and must be graph
+inputs, so their range is checked before every run. A deliberately
+invalid construction is reached through an internal `unchecked:`
+operation prefix that skips validation, since the public functions
+validate everything.
 
 ## Stage 4 — Autograd, trainer and optimisers
 
