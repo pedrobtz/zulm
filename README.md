@@ -18,7 +18,7 @@ Two use cases size the package:
 - **Training.** Small and medium neural networks trained in R on the
   CPU with ggml's autograd and its AdamW and SGD optimisers, with
   results that reproduce bit for bit at a fixed seed. The first
-  consumer is [zuflow](https://github.com/pedrobtz/zuflow), which
+  consumer is zuflow, which
   trains and samples an event-sequence generator.
 - **Inference.** Pretrained transformer checkpoints of up to a few
   hundred million parameters, loaded from GGUF or safetensors and run
