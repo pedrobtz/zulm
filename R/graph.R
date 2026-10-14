@@ -53,6 +53,7 @@ zl_graph <- function(build, p, inputs, loss = NULL, outputs = NULL) {
   if (!is.null(.zlm$building)) {
     zlm_abort("zl_graph() cannot be called inside another graph's build().", "zulm_invalid_argument")
   }
+  zlm_maybe_gc()
   gptr <- zlm_call(
     "zlm_graph_new", p$ptr, spec$names, spec$dims, spec$types,
     zlm_max_bytes(), zlm_threads()

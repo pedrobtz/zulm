@@ -47,6 +47,7 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_i32_roundtrip", (DL_FUNC) &zlm_i32_roundtrip, 1},
   {"zlm_graph_new", (DL_FUNC) &zlm_graph_new, 6},
   {"zlm_graph_free_", (DL_FUNC) &zlm_graph_free_, 1},
+  {"zlm_live_bytes", (DL_FUNC) &zlm_live_bytes, 0},
   {"zlm_graph_inputs", (DL_FUNC) &zlm_graph_inputs, 1},
   {"zlm_graph_param", (DL_FUNC) &zlm_graph_param, 2},
   {"zlm_tensor_info", (DL_FUNC) &zlm_tensor_info, 2},

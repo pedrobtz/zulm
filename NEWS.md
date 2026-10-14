@@ -57,5 +57,8 @@
   An operation without a gradient between a parameter and the loss is
   refused with `zulm_unsupported_backward`, naming it and its call.
 
+* `zl_graph()` and `zl_trainer()` collect garbage when graphs and trainers
+  no longer referenced hold over 128 MB, which R's collector does not see.
+
 * The bundled 'ggml' carries patches for the gradients of `MEAN`, `SUB`
   and `DIV` with broadcasting, and for gradient clipping in 'ggml-opt'.

@@ -121,6 +121,7 @@ zlm_check_unit <- function(x, what) {
 #' zl_param_get(p, "w")
 zl_trainer <- function(g, opt, accumulate = 1L, clip_norm = NULL) {
   zlm_check_graph(g)
+  zlm_maybe_gc()
   if (is.null(g$loss)) {
     zlm_abort("The graph has no `loss`; give zl_graph() one to train.", "zulm_invalid_argument")
   }

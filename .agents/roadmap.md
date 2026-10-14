@@ -296,7 +296,11 @@ between its parameters and its loss (`ggml_opt_init()` builds at
 `GGML_DEFAULT_GRAPH_SIZE`). A number divided by a tensor is now
 `scale_bias(x, 0, c) / x`, as `ggml_fill` has no backward. A weight
 broadcast over the fourth dimension of `zl_crossprod()`'s second operand
-has no gradient in ggml and is refused on a gradient path. Stage 1 was to
+has no gradient in ggml and is refused on a gradient path. Valgrind's
+runner ran out of memory on the gradient tests: the trainer's scheduler
+is now sized for `ggml-opt`'s graphs, and `zl_graph()` and `zl_trainer()`
+collect garbage when unreferenced objects hold over 128 MB outside R's
+heap (design §6.6). Stage 1 was to
 add the vendored copyright holders to `Authors@R`; this stage does, with
 `inst/COPYRIGHTS`.
 

@@ -277,3 +277,26 @@ test_that("training is bit-identical at one, two and four threads", {
   expect_identical(run(2L), one)
   expect_identical(run(4L), one)
 })
+
+test_that("unreferenced graphs and trainers are collected before memory piles up", {
+  zlm_call <- getFromNamespace("zlm_call", "zulm")
+  p <- zl_params()
+  zl_param(p, "w", c(3, 3))
+  make <- function() {
+    g <- zl_graph(function(x) list(loss = zl_sum(zl_crossprod(zl_param_tensor(p, "w"), x$x))),
+                  p, list(x = c(3, 2)), loss = "loss")
+    zl_trainer(g, zl_sgd())
+  }
+  invisible(gc())
+  base <- zlm_call("zlm_live_bytes")
+  peak <- base
+  for (i in 1:150) {
+    tr <- make()
+    peak <- max(peak, zlm_call("zlm_live_bytes"))
+  }
+  # 150 graphs and trainers hold over 300 MB when nothing collects them
+  expect_lt(peak - base, 300 * 2^20)
+  rm(tr)
+  invisible(gc())
+  expect_lt(zlm_call("zlm_live_bytes"), base + 1)
+})

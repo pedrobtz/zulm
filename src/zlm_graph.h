@@ -44,6 +44,7 @@ typedef struct zlm_graph {
   int state;
   int threads;
   double max_bytes, bytes_inputs, bytes_compute;
+  double bytes_live; /* counted in zlm_live_add() until freed */
 } zlm_graph;
 
 zlm_graph *zlm_graph_from(SEXP x);
@@ -59,6 +60,7 @@ struct ggml_cgraph *zlm_graph_dup(struct ggml_context *ctx, struct ggml_cgraph *
 #endif
 
 SEXP zlm_graph_new(SEXP sptr, SEXP names, SEXP dims, SEXP types, SEXP max_bytes, SEXP threads);
+SEXP zlm_live_bytes(void);
 SEXP zlm_graph_free_(SEXP x);
 SEXP zlm_graph_inputs(SEXP gptr);
 SEXP zlm_graph_param(SEXP gptr, SEXP name);

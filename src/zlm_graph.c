@@ -49,6 +49,7 @@ static SEXP tensor_tag(void) {
 
 static void graph_free(zlm_graph *g) {
   if (g == NULL) return;
+  zlm_live_add(-g->bytes_live);
   if (g->galloc) ggml_gallocr_free(g->galloc);
   if (g->backend) ggml_backend_free(g->backend);
   if (g->buf_in) ggml_backend_buffer_free(g->buf_in);
@@ -671,6 +672,9 @@ SEXP zlm_graph_finish(SEXP gptr, SEXP outputs) {
     zlm_raise("zulm_internal_error", R_NilValue, "ggml's CPU backend could not start.");
   }
   ggml_backend_cpu_set_n_threads(g->backend, g->threads > 0 ? g->threads : 1);
+  g->bytes_live = g->bytes_compute + g->bytes_inputs + (double) ggml_used_mem(g->ctx) +
+                  (double) ggml_used_mem(g->ctx_fwd);
+  zlm_live_add(g->bytes_live);
   g->state = ZLM_GRAPH_READY;
   SEXP handles = PROTECT(Rf_allocVector(VECSXP, n));
   for (int i = 0; i < n; i++) SET_VECTOR_ELT(handles, i, tensor_wrap(gptr, g->out[i]));

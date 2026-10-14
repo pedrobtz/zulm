@@ -977,6 +977,16 @@ the ISA variant, because a result is reproducible only within one.
   built; nothing grows during `zl_step()`. Each allocation is checked
   against `getOption("zulm.max_bytes")` (default 4 GiB) first;
   exceeding it is `zulm_memory_error`.
+- **Stage 4 (2026-10-14): memory R cannot see.** A graph and a trainer
+  hold memory outside R's heap, so R's garbage collector, which counts
+  only its own, let unreferenced ones pile up: the gradient tests peaked
+  at 1 GB, and valgrind's runner ran out of memory. Each trainer's
+  scheduler was also sized for 65 536 nodes, though `ggml-opt`
+  duplicates every training graph at `GGML_DEFAULT_GRAPH_SIZE`; it is
+  now sized at twice that, which cut the peak to 160 MB. zulm also
+  counts what live graphs and trainers hold, and `zl_graph()` and
+  `zl_trainer()` run a full collection first when that count has
+  doubled since the last one and passed 128 MB.
 - Objects are not serialisable: `saveRDS()` of a store keeps a dead
   pointer, and use after reload is `zulm_stale_error`. A store made by
   one ISA variant is `zulm_stale_error` under another (after a forced

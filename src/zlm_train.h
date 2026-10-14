@@ -20,6 +20,7 @@ typedef struct zlm_trainer {
   struct ggml_opt_optimizer_params pars; /* read by ggml-opt each step */
   float base_lr;
   double evals;
+  double bytes_live; /* counted in zlm_live_add() until freed */
 } zlm_trainer;
 
 int zlm_backward_check(SEXP gptr, struct ggml_tensor *loss, int set_params);

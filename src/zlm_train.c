@@ -372,6 +372,7 @@ static SEXP trainer_tag(void) {
 
 static void trainer_free(zlm_trainer *t) {
   if (t == NULL) return;
+  zlm_live_add(-t->bytes_live);
   if (t->opt) ggml_opt_free(t->opt);
   if (t->sched) ggml_backend_sched_free(t->sched);
   if (t->backend) ggml_backend_free(t->backend);
@@ -440,7 +441,10 @@ SEXP zlm_trainer_new(SEXP gptr, SEXP loss_h, SEXP optimizer, SEXP pars, SEXP acc
   t->backend = ggml_backend_cpu_init();
   if (t->backend == NULL) zlm_raise("zulm_internal_error", R_NilValue, "ggml's CPU backend could not start.");
   ggml_backend_cpu_set_n_threads(t->backend, Rf_asInteger(threads) > 0 ? Rf_asInteger(threads) : 1);
-  t->sched = ggml_backend_sched_new(&t->backend, NULL, 1, 4 * ZLM_GRAPH_NODES_TRAIN, false, false);
+  /* ggml-opt duplicates every training graph at the forward graph's size,
+     GGML_DEFAULT_GRAPH_SIZE, so no graph the scheduler sees is larger; the
+     scheduler's tables grow with this size and are reset on every step */
+  t->sched = ggml_backend_sched_new(&t->backend, NULL, 1, 2 * GGML_DEFAULT_GRAPH_SIZE, false, false);
   if (t->sched == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory creating a scheduler.");
   struct opt_job j;
   j.t = t;
@@ -459,6 +463,10 @@ SEXP zlm_trainer_new(SEXP gptr, SEXP loss_h, SEXP optimizer, SEXP pars, SEXP acc
     zlm_raise(st == ZLM_STATUS_ENGINE ? "zulm_engine_error" : "zulm_internal_error", R_NilValue,
               "ggml-opt could not build the training graphs: %s", msg[0] ? msg : "unknown error");
   }
+  /* ggml-opt's graphs and the scheduler's tables, measured at about 1 MB,
+     beside the scheduler's buffer, which ggml reports */
+  t->bytes_live = 1.0 * 1024 * 1024 + (double) ggml_backend_sched_get_buffer_size(t->sched, t->backend);
+  zlm_live_add(t->bytes_live);
   UNPROTECT(1);
   return tptr;
 }
