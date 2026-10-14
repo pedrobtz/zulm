@@ -24,6 +24,7 @@
 #include "ggml-opt.h"
 #include "zlm_glue.h"
 #include "zlm_graph.h"
+#include "zlm_pool.h"
 #include "zlm_r.h"
 #include "zlm_store.h"
 #include "zlm_train.h"
@@ -341,10 +342,18 @@ SEXP zlm_grad(SEXP gptr, SEXP loss_h, SEXP names, SEXP threads) {
     zlm_raise("zulm_memory_error", R_NilValue, "Out of memory allocating the gradient graph.");
   }
   ggml_graph_reset(j.gb);
+  (void) threads;
   ggml_backend_t backend = ggml_backend_cpu_init();
-  ggml_backend_cpu_set_n_threads(backend, Rf_asInteger(threads) > 0 ? Rf_asInteger(threads) : 1);
+  zlm_backend_register(backend);
+  zlm_prepare_backend(backend);
   enum ggml_status status = ggml_backend_graph_compute(backend, j.gb);
+  zlm_backend_unregister(backend);
   ggml_backend_free(backend);
+  if (zlm_interrupted()) {
+    ggml_gallocr_free(galloc);
+    ggml_free(j.ctx);
+    zlm_raise("zulm_interrupt", R_NilValue, "The computation was interrupted.");
+  }
   SEXP out = PROTECT(Rf_allocVector(VECSXP, n + 1));
   if (status == GGML_STATUS_SUCCESS) {
     SEXP lv = Rf_allocVector(REALSXP, 1);
@@ -383,7 +392,10 @@ static void trainer_free(zlm_trainer *t) {
   if (t->opt) ggml_opt_free(t->opt);
   if (t->ctx_opt) ggml_free(t->ctx_opt);
   if (t->sched) ggml_backend_sched_free(t->sched);
-  if (t->backend) ggml_backend_free(t->backend);
+  if (t->backend) {
+    zlm_backend_unregister(t->backend);
+    ggml_backend_free(t->backend);
+  }
   free(t);
 }
 
@@ -448,7 +460,9 @@ SEXP zlm_trainer_new(SEXP gptr, SEXP loss_h, SEXP optimizer, SEXP pars, SEXP acc
   t->base_lr = (float) pp[0];
   t->backend = ggml_backend_cpu_init();
   if (t->backend == NULL) zlm_raise("zulm_internal_error", R_NilValue, "ggml's CPU backend could not start.");
-  ggml_backend_cpu_set_n_threads(t->backend, Rf_asInteger(threads) > 0 ? Rf_asInteger(threads) : 1);
+  zlm_backend_register(t->backend);
+  (void) threads;
+  zlm_prepare_backend(t->backend);
   /* ggml-opt duplicates every training graph at the forward graph's size,
      GGML_DEFAULT_GRAPH_SIZE, so no graph the scheduler sees is larger; the
      scheduler's tables and its reserve for splits grow with this size */
@@ -505,9 +519,14 @@ SEXP zlm_trainer_step(SEXP tptr, SEXP lr) {
   t->pars.sgd.alpha = a;
   /* draws in the graph use this step's number, 1 for the first */
   t->g->step = (int64_t) t->evals + 1;
+  zlm_prepare_backend(t->backend);
   ggml_opt_alloc(t->opt, true);
   ggml_opt_eval(t->opt, NULL);
   t->evals += 1;
+  if (zlm_interrupted()) {
+    zlm_raise("zulm_interrupt", R_NilValue,
+              "The step was interrupted; the optimiser's state is now undefined: call zl_reset().");
+  }
   struct ggml_tensor *l = ggml_opt_loss(t->opt);
   float v = 0;
   ggml_backend_tensor_get(l, &v, 0, sizeof v);
