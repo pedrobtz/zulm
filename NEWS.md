@@ -87,3 +87,12 @@
   available cores and at 2 while `R CMD check` limits cores. One persistent
   pool serves every computation, and is recreated in a forked process. A
   computation can be interrupted; it then signals `zulm_interrupt`.
+
+* safetensors: `zl_safetensors_read()`, `zl_load_safetensors()` (with a
+  name map) and `zl_save_safetensors()`. PyTorch's `[out, in]` weights
+  load as `c(in, out)` with no transposition.
+
+* Half-precision weights: `zl_load(keep_types = TRUE)` and
+  `zl_load_safetensors()` keep f16 and bf16 parameters in their type, and
+  `zl_param_names(types = TRUE)` reports types. The documentation states
+  their cost in precision.

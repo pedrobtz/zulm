@@ -24,7 +24,7 @@ zl_param_get(p, name)
 
 zl_param_set(p, name, value)
 
-zl_param_names(p)
+zl_param_names(p, types = FALSE)
 
 zl_param_count(p)
 
@@ -45,6 +45,9 @@ the store.}
 \item{value}{An array of \code{dim(value)} equal to the parameter's
 dimensions, or a vector of the right length for a one-dimensional
 parameter. \code{NA} is refused.}
+
+\item{types}{For \code{zl_param_names()}: \code{TRUE} returns the parameters'
+storage types, named by parameter.}
 }
 \value{
 \code{zl_params()} returns an empty store. \code{zl_param()} and
@@ -66,6 +69,12 @@ when the store is garbage collected. Stores cannot be saved with
 precision, for weights that are only read). R doubles are rounded to
 the nearest representable value; values beyond the type's range become
 infinite with a \code{zulm_range_warning}.
+
+Half precision costs more than storage: 'ggml' converts the activations
+to the weight's type before a product, so \code{\link[=zl_crossprod]{zl_crossprod()}} with an f16
+weight differs from the f32 product by about 1e-3 of the output's
+scale, and with a bf16 weight by about 2e-3 to 3e-3. Results that must
+match a reference closely need f32 weights.
 
 An R array of \code{dim = c(d1, d2, d3, d4)} is stored with the first index
 fastest, as R stores it, so values move without reordering.

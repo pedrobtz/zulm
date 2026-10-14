@@ -3,7 +3,8 @@
 #' `zl_save()` writes every parameter of a store, and optional metadata,
 #' to a GGUF file, the format of the 'ggml' library, which other tools
 #' (llama.cpp, the 'gguf' Python package) read. `zl_load()` reads one into
-#' a new store, with every tensor in single precision.
+#' a new store, with every tensor in single precision unless `keep_types`
+#' is `TRUE`.
 #'
 #' Only parameters are saved: the state of an optimiser is not, so
 #' training resumed from a loaded store starts with fresh optimiser state.
@@ -14,6 +15,9 @@
 #'
 #' @param p A parameter store.
 #' @param path The file to write or read.
+#' @param keep_types For `zl_load()`: `FALSE` widens every tensor to f32;
+#'   `TRUE` keeps f16 and bf16 tensors in their type in memory (see
+#'   [zl_params()] for the cost in precision).
 #' @param type The type tensors are written as: `"f32"`, `"f16"` or
 #'   `"bf16"`. Half-precision types halve the file and round each value.
 #' @param metadata A named list of key-value pairs to store with the
@@ -46,13 +50,16 @@ zl_save <- function(p, path, type = c("f32", "f16", "bf16"), metadata = list()) 
 
 #' @rdname zl_save
 #' @export
-zl_load <- function(path) {
+zl_load <- function(path, keep_types = FALSE) {
   zlm_check_string(path, "path")
+  if (!isTRUE(keep_types) && !isFALSE(keep_types)) {
+    zlm_abort("`keep_types` must be TRUE or FALSE.", "zulm_invalid_argument")
+  }
   full <- path.expand(path)
   if (!file.exists(full) || dir.exists(full)) {
     zlm_abort(sprintf("There is no file '%s'.", path), "zulm_file_error")
   }
-  res <- zlm_call("zlm_store_load", enc2utf8(full), zlm_max_bytes())
+  res <- zlm_call("zlm_store_load", enc2utf8(full), zlm_max_bytes(), keep_types)
   zlm_new_params(res[[1L]], metadata = res[[2L]])
 }
 

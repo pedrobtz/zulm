@@ -7,7 +7,7 @@
 \usage{
 zl_save(p, path, type = c("f32", "f16", "bf16"), metadata = list())
 
-zl_load(path)
+zl_load(path, keep_types = FALSE)
 }
 \arguments{
 \item{p}{A parameter store.}
@@ -20,6 +20,10 @@ zl_load(path)
 \item{metadata}{A named list of key-value pairs to store with the
 tensors: each value a character, integer, double or logical vector
 without \code{NA}. Keys starting with \code{zulm.} are reserved.}
+
+\item{keep_types}{For \code{zl_load()}: \code{FALSE} widens every tensor to f32;
+\code{TRUE} keeps f16 and bf16 tensors in their type in memory (see
+\code{\link[=zl_params]{zl_params()}} for the cost in precision).}
 }
 \value{
 \code{zl_save()} returns \code{path} invisibly. \code{zl_load()} returns a
@@ -30,7 +34,8 @@ a named list.
 \code{zl_save()} writes every parameter of a store, and optional metadata,
 to a GGUF file, the format of the 'ggml' library, which other tools
 (llama.cpp, the 'gguf' Python package) read. \code{zl_load()} reads one into
-a new store, with every tensor in single precision.
+a new store, with every tensor in single precision unless \code{keep_types}
+is \code{TRUE}.
 }
 \details{
 Only parameters are saved: the state of an optimiser is not, so

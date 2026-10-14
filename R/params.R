@@ -12,6 +12,12 @@
 #' the nearest representable value; values beyond the type's range become
 #' infinite with a `zulm_range_warning`.
 #'
+#' Half precision costs more than storage: 'ggml' converts the activations
+#' to the weight's type before a product, so [zl_crossprod()] with an f16
+#' weight differs from the f32 product by about 1e-3 of the output's
+#' scale, and with a bf16 weight by about 2e-3 to 3e-3. Results that must
+#' match a reference closely need f32 weights.
+#'
 #' An R array of `dim = c(d1, d2, d3, d4)` is stored with the first index
 #' fastest, as R stores it, so values move without reordering.
 #'
@@ -24,6 +30,8 @@
 #' @param value An array of `dim(value)` equal to the parameter's
 #'   dimensions, or a vector of the right length for a one-dimensional
 #'   parameter. `NA` is refused.
+#' @param types For `zl_param_names()`: `TRUE` returns the parameters'
+#'   storage types, named by parameter.
 #' @return `zl_params()` returns an empty store. `zl_param()` and
 #'   `zl_param_set()` return the store invisibly. `zl_param_get()` returns
 #'   a double vector or array; `zl_param_names()` the names in the order
@@ -149,9 +157,10 @@ zl_param_set <- function(p, name, value) {
 
 #' @rdname zl_params
 #' @export
-zl_param_names <- function(p) {
+zl_param_names <- function(p, types = FALSE) {
   zlm_check_params(p)
-  zlm_call("zlm_store_info", p$ptr)$names
+  info <- zlm_call("zlm_store_info", p$ptr)
+  if (isTRUE(types)) stats::setNames(info$types, info$names) else info$names
 }
 
 #' @rdname zl_params

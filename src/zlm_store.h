@@ -36,6 +36,6 @@ SEXP zlm_store_get(SEXP ptr, SEXP name);
 SEXP zlm_store_set(SEXP ptr, SEXP name, SEXP values);
 SEXP zlm_store_info(SEXP ptr);
 SEXP zlm_store_save(SEXP ptr, SEXP path, SEXP type, SEXP meta, SEXP max_bytes);
-SEXP zlm_store_load(SEXP path, SEXP max_bytes);
+SEXP zlm_store_load(SEXP path, SEXP max_bytes, SEXP keep_types);
 
 #endif

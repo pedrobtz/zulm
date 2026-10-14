@@ -1148,7 +1148,16 @@ leaves the training path untouched.
   users who accept the difference, which the documentation quantifies,
   and `zulm_info()` and `zl_param_names()` report the types a store
   holds. `zl_cast()` converts activations inside a graph (`ggml_cast`),
-  forward-only. Quantised types are under Later.
+  forward-only. Quantised types are under Later. **Measured in Stage 8:**
+  a 256-by-128 weight times 64 random columns differs from the f32
+  product by 0.8e-3 to 1.3e-3 of the output's largest value with an f16
+  weight, and 1.7e-3 to 2.8e-3 with bf16; a test keeps each inside the
+  documented band (2e-4 to 5e-3 for f16, 5e-4 to 1e-2 for bf16) and
+  fails if it leaves it in either direction. `zl_load(keep_types =
+  TRUE)` keeps a GGUF file's f16 and bf16 tensors in their type (by
+  default it still widens, as §6.1 says), and `zl_param_names(p, types =
+  TRUE)` returns the types; `zulm_info()` reports the build, not a
+  store, so it does not.
 - **Graph cache.** `zl_graph_cache()` wraps `zl_graph()` with a cache
   keyed by the input shapes, so a loop whose shapes vary (horizons,
   batch sizes, `n_new`) pays graph construction once per shape; entries
@@ -1437,6 +1446,24 @@ the byte buffer. Duplicate keys are disallowed.
 - **Types in memory.** With `zl_param(type = "f16")` declared, an F16
   tensor in the file is copied as is and an F32 one is rounded on the
   way in (§6.9); by default everything widens to f32.
+
+**As built in Stage 8 (2026-10-14).** The header length is capped at
+100 MB and must fit the file; a NUL byte in the header is refused; the
+header must be a JSON object whose entries have exactly `dtype`, `shape`
+and `data_offsets`, and whose offsets, sorted, start at 0, abut and end
+at the buffer's end. `zl_load_safetensors(p, path, map)` fills every
+parameter whose (mapped) name the file has, refuses a shape that
+differs (trailing unit dimensions aside) with `zulm_shape_error` and an
+integer type with `zulm_type_error`, leaves other parameters as they
+are, and returns the names it filled. `zl_save_safetensors()` pads the
+header with spaces so the buffer starts on an 8-byte boundary. A real
+header is a fixture: Toto 2.0 4M's (48 F32 tensors, 5 016 bytes),
+fetched from the Hub with range requests, without the 16 MB of data.
+The roadmap's header fuzz target is a mutation test: hundreds of
+randomly mutated headers must each read or raise a zulm error. The
+parsing is zujson's and the checks are R, which r-actions' libFuzzer
+harness cannot load (its embedded R has no packages); a libFuzzer target
+for zulm's C readers joins Stage 13's.
 
 Neither ggmlR (no match for "safetensors" in `R/` or `src/`; it reads
 the tensor catalogue of `.pth` files in `R/pth.R`) nor the upstream ggml

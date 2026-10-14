@@ -707,7 +707,8 @@ static void gguf_finalize(SEXP x) {
 
 /* zl_load(): a new store with every tensor of a GGUF file widened to f32
    (design §6.1), and the metadata as a named list. */
-SEXP zlm_store_load(SEXP path, SEXP max_bytes) {
+SEXP zlm_store_load(SEXP path, SEXP max_bytes, SEXP keep_types) {
+  int keep = Rf_asLogical(keep_types) == 1;
   const char *fname = Rf_translateCharUTF8(STRING_ELT(path, 0));
   char msg[2048] = "";
   char detail[1024];
@@ -760,7 +761,7 @@ SEXP zlm_store_load(SEXP path, SEXP max_bytes) {
       rank = ranks_meta[i];
     }
     ranks[i] = rank;
-    types[i] = GGML_TYPE_F32;
+    types[i] = keep ? tp : GGML_TYPE_F32;
   }
   zlm_store *s = (zlm_store *) calloc(1, sizeof *s);
   if (s == NULL) {
@@ -786,7 +787,7 @@ SEXP zlm_store_load(SEXP path, SEXP max_bytes) {
       bad = 1;
       break;
     }
-    if (tp == GGML_TYPE_F32) {
+    if (tp == t->type) {
       bad = fread(t->data, 1, size, f) != size;
     } else {
       if (size > tmp_cap) {

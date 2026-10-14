@@ -17,6 +17,7 @@
 #include "zlm_train.h"
 #include "zlm_rng.h"
 #include "zlm_pool.h"
+#include "zlm_st.h"
 
 SEXP zlm_native_info(void);
 SEXP zlm_log_drain(void);
@@ -45,7 +46,7 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_store_set", (DL_FUNC) &zlm_store_set, 3},
   {"zlm_store_info", (DL_FUNC) &zlm_store_info, 1},
   {"zlm_store_save", (DL_FUNC) &zlm_store_save, 5},
-  {"zlm_store_load", (DL_FUNC) &zlm_store_load, 2},
+  {"zlm_store_load", (DL_FUNC) &zlm_store_load, 3},
   {"zlm_i32_roundtrip", (DL_FUNC) &zlm_i32_roundtrip, 1},
   {"zlm_graph_new", (DL_FUNC) &zlm_graph_new, 6},
   {"zlm_graph_free_", (DL_FUNC) &zlm_graph_free_, 1},
@@ -76,6 +77,10 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_threads_", (DL_FUNC) &zlm_threads_, 1},
   {"zlm_poll_", (DL_FUNC) &zlm_poll_, 1},
   {"zlm_cores", (DL_FUNC) &zlm_cores, 0},
+  {"zlm_st_header", (DL_FUNC) &zlm_st_header, 1},
+  {"zlm_st_read", (DL_FUNC) &zlm_st_read, 5},
+  {"zlm_st_fill", (DL_FUNC) &zlm_st_fill, 7},
+  {"zlm_st_write", (DL_FUNC) &zlm_st_write, 4},
   {NULL, NULL, 0}
 };
 
