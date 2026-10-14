@@ -16,3 +16,33 @@
 
 - Installing from source with `ZULM_CFLAGS` and `ZULM_CXXFLAGS` set
   builds one variant for the local CPU (not on Windows).
+
+- Parameter stores:
+  [`zl_params()`](https://pedrobtz.github.io/zulm/reference/zl_params.md),
+  [`zl_param()`](https://pedrobtz.github.io/zulm/reference/zl_params.md)
+  with `init` and `type` (`"f32"`, `"f16"` or `"bf16"`),
+  [`zl_param_get()`](https://pedrobtz.github.io/zulm/reference/zl_params.md),
+  [`zl_param_set()`](https://pedrobtz.github.io/zulm/reference/zl_params.md),
+  [`zl_param_names()`](https://pedrobtz.github.io/zulm/reference/zl_params.md),
+  [`zl_param_count()`](https://pedrobtz.github.io/zulm/reference/zl_params.md)
+  and
+  [`zl_param_tensor()`](https://pedrobtz.github.io/zulm/reference/zl_params.md);
+  initialisers
+  [`zl_init_normal()`](https://pedrobtz.github.io/zulm/reference/zl_init_normal.md),
+  [`zl_init_uniform()`](https://pedrobtz.github.io/zulm/reference/zl_init_normal.md),
+  [`zl_init_zeros()`](https://pedrobtz.github.io/zulm/reference/zl_init_normal.md)
+  and
+  [`zl_init_ones()`](https://pedrobtz.github.io/zulm/reference/zl_init_normal.md),
+  drawing from ‘zurand’ under a key derived from the parameter’s name.
+
+- [`zl_save()`](https://pedrobtz.github.io/zulm/reference/zl_save.md)
+  and
+  [`zl_load()`](https://pedrobtz.github.io/zulm/reference/zl_save.md)
+  write and read stores as GGUF files, with metadata, at f32, f16 or
+  bf16.
+
+- Every error inherits `zulm_error` and every warning `zulm_warning`;
+  see
+  [`?"zulm-conditions"`](https://pedrobtz.github.io/zulm/reference/zulm-conditions.md)
+  for the classes. Allocations are checked against
+  `getOption("zulm.max_bytes")` (4 GiB by default).

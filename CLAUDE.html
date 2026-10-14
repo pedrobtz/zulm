@@ -43,7 +43,7 @@
 </div>
 <div class="section level2">
 <h2 id="current-state">Current state<a class="anchor" aria-label="anchor" href="#current-state"></a></h2>
-<p>Verified 2026-10-14: Stage 1 of the roadmap. ggml v0.26.0’s CPU subset is vendored and builds as CPU-dispatched variants with a clean <code>R CMD check --as-cran</code> on every r-actions leg; <code><a href="reference/zulm_info.html">zulm_info()</a></code> is the only exported function. The R API of design §5 starts in Stage 2. Patch drafts P1, P2 and P7 wait in <code>tools/patches/drafts/</code>; P8 is vendored. None of them has an upstream pull request yet (design §9.3).</p>
+<p>Verified 2026-10-14: Stage 2 of the roadmap. ggml v0.26.0’s CPU subset is vendored and builds as CPU-dispatched variants (Stage 1). Parameter stores, initialisers, GGUF persistence and the condition hierarchy exist (Stage 2). Graphs and operations start in Stage 3. Patch drafts P1, P2 and P7 wait in <code>tools/patches/drafts/</code>; P8 is vendored. None of them has an upstream pull request yet (design §9.3).</p>
 </div>
 <div class="section level2">
 <h2 id="stage-tracking">Stage tracking<a class="anchor" aria-label="anchor" href="#stage-tracking"></a></h2>
@@ -106,7 +106,11 @@
 <li>
 <strong>Never write a compiler flag into <code>Makevars</code>, never compile a ggml source directly.</strong> Every ggml source goes through a <code>zlm_v/</code> wrapper, which is what applies <code>zlm_compat.h</code> (no stdio, <code>abort</code> or <code>_Exit</code> may be linked) and the ISA pragmas. Regenerate with <code>tools/gen-build</code>.</li>
 <li>
-<strong>A variant’s shared object is never unloaded.</strong> Objects it created are finalised by its code; <code>R/load.R</code> keeps every loaded variant.</li>
+<strong>A variant’s shared object is never unloaded.</strong> Objects it created are finalised by its code; <code>R/load.R</code> keeps every loaded variant, and a store made under one variant is <code>zulm_stale_error</code> under another.</li>
+<li>
+<strong>C code raises R errors only through <code>zlm_raise()</code>, after freeing its own memory.</strong> <code>zlm_raise()</code> longjmps; anything malloc’d or any ggml or gguf context not owned by a protected external pointer leaks.</li>
+<li>
+<strong>Store tensors never move.</strong> A store grows by batches; never reallocate a batch, because graphs hold its tensors’ addresses.</li>
 <li>
 <strong>Results must not depend on the thread count.</strong> Reported losses are fixed-order sums of per-row values and random draws come from <code>zurand</code> under keys, never from a thread-local generator (design §6.5).</li>
 </ul></div>

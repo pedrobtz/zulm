@@ -22,9 +22,17 @@ Two use cases size the package:
 
 zulm is under development toward its first CRAN release; the
 [roadmap](https://github.com/pedrobtz/zulm/issues/1) tracks progress. So
-far it bundles ggml’s CPU subset and loads the build that suits the CPU;
-[`zulm_info()`](https://pedrobtz.github.io/zulm/reference/zulm_info.md)
-reports it.
+far it bundles ggml’s CPU subset, loads the build that suits the CPU,
+and holds parameters in stores saved as GGUF files:
+
+``` r
+
+library(zulm)
+p <- zl_params()
+zl_param(p, "w", c(64, 16), init = zl_init_normal(sd = 0.02))
+zl_save(p, "model.gguf", type = "bf16", metadata = list(width = 64L))
+q <- zl_load("model.gguf")
+```
 
 ## A build for your own CPU
 

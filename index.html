@@ -62,12 +62,18 @@
 <li>
 <strong>Inference.</strong> Pretrained transformer checkpoints of up to a few hundred million parameters, loaded from GGUF or safetensors and run without Python, LibTorch or a GPU toolchain. The first consumer is <a href="https://github.com/pedrobtz/zukzeit" class="external-link">zukzeit</a>, which runs time-series foundation models.</li>
 </ul>
-<p>zulm is under development toward its first CRAN release; the <a href="https://github.com/pedrobtz/zulm/issues/1" class="external-link">roadmap</a> tracks progress. So far it bundles ggml’s CPU subset and loads the build that suits the CPU; <code><a href="reference/zulm_info.html">zulm_info()</a></code> reports it.</p>
+<p>zulm is under development toward its first CRAN release; the <a href="https://github.com/pedrobtz/zulm/issues/1" class="external-link">roadmap</a> tracks progress. So far it bundles ggml’s CPU subset, loads the build that suits the CPU, and holds parameters in stores saved as GGUF files:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/pedrobtz/zulm" class="external-link">zulm</a></span><span class="op">)</span></span>
+<span><span class="va">p</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/zl_params.html">zl_params</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/zl_params.html">zl_param</a></span><span class="op">(</span><span class="va">p</span>, <span class="st">"w"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">64</span>, <span class="fl">16</span><span class="op">)</span>, init <span class="op">=</span> <span class="fu"><a href="reference/zl_init_normal.html">zl_init_normal</a></span><span class="op">(</span>sd <span class="op">=</span> <span class="fl">0.02</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/zl_save.html">zl_save</a></span><span class="op">(</span><span class="va">p</span>, <span class="st">"model.gguf"</span>, type <span class="op">=</span> <span class="st">"bf16"</span>, metadata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>width <span class="op">=</span> <span class="fl">64L</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">q</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/zl_save.html">zl_load</a></span><span class="op">(</span><span class="st">"model.gguf"</span><span class="op">)</span></span></code></pre></div>
 <div class="section level2">
 <h2 id="a-build-for-your-own-cpu">A build for your own CPU<a class="anchor" aria-label="anchor" href="#a-build-for-your-own-cpu"></a>
 </h2>
 <p>The package ships several builds of its compiled code, one per instruction-set level, and picks the best one the CPU supports. On Linux and macOS, a source install can instead build one variant for the installing machine:</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Sys.setenv.html" class="external-link">Sys.setenv</a></span><span class="op">(</span>ZULM_CFLAGS <span class="op">=</span> <span class="st">"-march=native"</span>, ZULM_CXXFLAGS <span class="op">=</span> <span class="st">"-march=native"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"zulm"</span>, type <span class="op">=</span> <span class="st">"source"</span><span class="op">)</span></span></code></pre></div>
 <p>It is only worth it on x86-64 CPUs with AVX-512; on arm64 and on AVX2 machines the shipped builds are as fast. Results reproduce within a build, not between a native build and the shipped ones.</p>
@@ -76,7 +82,7 @@
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
 <p>You can install the development version of zulm from <a href="https://github.com/pedrobtz/zulm" class="external-link">GitHub</a> with:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"pedrobtz/zulm"</span><span class="op">)</span></span></code></pre></div>
 </div>
