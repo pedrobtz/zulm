@@ -903,6 +903,29 @@ patch (§9.3) lands upstream:
   default-seeded `std::mt19937`; `std::shuffle`'s output is not
   specified by the C++ standard, so it differs between libstdc++ and
   libc++.
+- **As built in Stage 4 (2026-10-14).** `zl_trainer()` runs the
+  backward pre-check, flags every f32 parameter the loss depends on with
+  `ggml_set_param()`, and calls `ggml_opt_init()` with static graphs on
+  the graph's original nodes (`ctx_compute` is the graph's context,
+  `inputs` its first input, `outputs` the loss, loss type "sum",
+  `opt_period = accumulate`), on a CPU backend scheduler of its own.
+  Half-precision parameters on a gradient path are `zulm_type_error`.
+  `ggml_opt_init()` builds its forward graph at
+  `GGML_DEFAULT_GRAPH_SIZE`, so a trained graph has at most 2048 nodes
+  between its parameters and its loss; an inference graph has no such
+  limit. `zl_grad()` does not read `ggml-opt`'s gradients, which with
+  `accumulate = 1` exist only inside its private graph copies: it
+  builds a backward graph of its own on a copy of the forward graph with
+  `ggml_build_backward_expand()`, allocates it with the graph allocator
+  and returns the gradient at the current parameters on the inputs last
+  written. A number divided by a tensor became `scale_bias(x, 0, c) / x`,
+  because `ggml_fill` has no backward (an infinite element of `x` now
+  gives NaN, not 0). `zl_crossprod()` with a weight broadcast over `b`'s
+  fourth dimension has no gradient for the weight (ggml's `MUL_MAT`
+  backward reduces over the third only) and is refused when the weight
+  needs one. Training is bit-identical at one, two and four threads
+  with llamafile kernels and `clip_norm` (a test), which settles
+  question 7's training-step condition.
 - Sampling (rectified-flow Euler steps, categorical draws) runs in R
   over `zl_forward()` calls, or in zuflow's C loops over the table;
   random numbers come from Philox, keyed by `zl_seed()`.
@@ -1639,6 +1662,14 @@ now.
 | P8 | no `static_assert` macro under C23 | warns (below) | none: vendored |
 | P9 | GGUF tensor type checked before it is a `ggml_type` | UB (below) | none: vendored |
 | P10 | type-table functions called through their own types | UB (below) | none: vendored |
+
+**Status, Stage 4 (2026-10-14).** P1, P2 and P7 are vendored
+(`tools/patches/`) beside P8, P9 and P10, each pinned by a regression
+test. P7 also makes
+every gradient the optimiser step reads contiguous: the step kernels read
+the gradient with the weight's strides, and a parameter used through a
+permutation has a strided gradient, which upstream's `ggml-opt` would
+apply to the wrong elements. Still none has an upstream pull request.
 
 **Status, Stage 1 (2026-10-14).** P1, P2 and P7 are drafted against
 `v0.26.0` in `tools/patches/drafts/`, which `tools/vendor-ggml` does not

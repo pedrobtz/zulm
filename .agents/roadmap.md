@@ -23,7 +23,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | 1 | [Vendored ggml and the CPU-dispatch go/no-go](#stage-1--vendored-ggml-and-the-cpu-dispatch-gono-go) | [#3](https://github.com/pedrobtz/zulm/issues/3) | [#21](https://github.com/pedrobtz/zulm/pull/21) | 2026-10-14 |
 | 2 | [Tensors, types, store and GGUF](#stage-2--tensors-types-store-and-gguf) | [#4](https://github.com/pedrobtz/zulm/issues/4) | [#22](https://github.com/pedrobtz/zulm/pull/22) | 2026-10-14 |
 | 3 | [Graphs, operations, forward and validation](#stage-3--graphs-operations-forward-and-validation) | [#5](https://github.com/pedrobtz/zulm/issues/5) | [#24](https://github.com/pedrobtz/zulm/pull/24) | 2026-10-14 |
-| 4 | [Autograd, trainer and optimisers](#stage-4--autograd-trainer-and-optimisers) | [#6](https://github.com/pedrobtz/zulm/issues/6) | | |
+| 4 | [Autograd, trainer and optimisers](#stage-4--autograd-trainer-and-optimisers) | [#6](https://github.com/pedrobtz/zulm/issues/6) | | 2026-10-14 |
 | 5 | [zurand in graphs and per-row loss sums](#stage-5--zurand-in-graphs-and-per-row-loss-sums) | [#7](https://github.com/pedrobtz/zulm/issues/7) | | |
 | 6 | [Modules, the driving model and PyTorch fixtures](#stage-6--modules-the-driving-model-and-pytorch-fixtures) | [#8](https://github.com/pedrobtz/zulm/issues/8) | | |
 | 7 | [Thread pool, interrupts, fork and determinism](#stage-7--thread-pool-interrupts-fork-and-determinism) | [#9](https://github.com/pedrobtz/zulm/issues/9) | | |
@@ -285,6 +285,20 @@ gradient check.
   sees them.
 
 **Design.** §6.2 to §6.4, §9.3; D5, D7, D26.
+
+**Deviations (2026-10-14).** P7 does more than clip: it also makes every
+gradient the optimiser step reads contiguous, since a parameter used
+through a permutation has a strided gradient that upstream's step would
+apply to the wrong elements. `zl_grad()` builds its own backward graph
+on a copy of the forward graph, because `ggml-opt` keeps gradients only
+inside its private copies. A trained graph holds at most 2048 nodes
+between its parameters and its loss (`ggml_opt_init()` builds at
+`GGML_DEFAULT_GRAPH_SIZE`). A number divided by a tensor is now
+`scale_bias(x, 0, c) / x`, as `ggml_fill` has no backward. A weight
+broadcast over the fourth dimension of `zl_crossprod()`'s second operand
+has no gradient in ggml and is refused on a gradient path. Stage 1 was to
+add the vendored copyright holders to `Authors@R`; this stage does, with
+`inst/COPYRIGHTS`.
 
 ## Stage 5 — zurand in graphs and per-row loss sums
 

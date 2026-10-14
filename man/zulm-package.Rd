@@ -25,5 +25,10 @@ Authors:
   \item Pedro Baltazar \email{pedrobtz@gmail.com} [copyright holder]
 }
 
+Other contributors:
+\itemize{
+  \item The ggml authors (Bundled 'ggml' library; see inst/COPYRIGHTS) [copyright holder]
+}
+
 }
 \keyword{internal}
