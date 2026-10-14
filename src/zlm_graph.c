@@ -292,7 +292,11 @@ static int is_half(const struct ggml_tensor *t) {
 
 /* Contiguous operands for every kernel that is not a pure view. */
 static struct ggml_tensor *cont(struct ggml_context *ctx, struct ggml_tensor *t) {
-  return ggml_is_contiguous(t) ? t : ggml_cont(ctx, t);
+  /* ggml_is_contiguous() passes a tensor whose first dimension is 1 whatever
+     its stride, as a transposed column has; kernels then assert that rows
+     are dense (nb[0] is the element size), which is fatal in compute */
+  int dense = ggml_is_contiguous(t) && t->nb[0] == ggml_type_size(t->type) && !ggml_is_transposed(t);
+  return dense ? t : ggml_cont(ctx, t);
 }
 
 static int can_repeat(const struct ggml_tensor *b, const struct ggml_tensor *a) {
@@ -515,6 +519,10 @@ static void validate(zlm_opjob *j, SEXP call) {
   if (strcmp(op, "cast") == 0) {
     if (a->type != GGML_TYPE_F32 && !is_half(a)) type_error(op, a);
     return;
+  }
+  if (strcmp(op, "rms_norm") == 0 && !(j->p[0] >= 0 && j->p[0] < 1e30)) {
+    /* the kernel asserts eps >= 0 during compute, where it is fatal */
+    zlm_raise("zulm_invalid_argument", R_NilValue, "rms_norm's eps must be a non-negative number.");
   }
   if (strcmp(op, "rope") == 0) {
     need_f32(op, a);

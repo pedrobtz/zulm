@@ -18,6 +18,16 @@
  * '#pragma GCC optimize("unroll-loops")' asks GCC for the unrolling
  * -funroll-loops gives; clang unrolls at -O2 already.
  */
+
+/* ggml's assert() checks are debugging aids that upstream's release builds
+   compile out (CMake defines NDEBUG). R does not define NDEBUG, and an
+   assert() calls the C library's abort path directly, past zlm_compat.h:
+   a NaN reaching softmax's debug check killed the R session. Defined
+   here, before any header, the checks go as they do upstream; GGML_ASSERT,
+   which zulm routes to its abort callback, is unaffected. */
+#ifndef NDEBUG
+#define NDEBUG 1
+#endif
 #ifndef ZLM_VARIANT_BEGIN_H
 #define ZLM_VARIANT_BEGIN_H
 
