@@ -1,14 +1,36 @@
 Package: zulm
-Title: What the Package Does (One Line, Title Case)
+Title: Tensor Graphs, Training and Inference on 'ggml'
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+    person("Pedro", "Baltazar", , "pedrobtz@gmail.com", role = c("aut", "cre", "cph"))
+Description: Builds computation graphs of tensors in R, runs them on the
+    CPU, differentiates them and trains their parameters, through the
+    'ggml' tensor library (<https://github.com/ggml-org/ggml>) bundled in
+    its CPU subset. Graphs are built once per input shape and run many
+    times; the same operations train small and medium neural networks
+    with the AdamW and SGD optimisers and run pretrained transformer
+    checkpoints read from 'GGUF' or 'safetensors' files. Results
+    reproduce bit for bit at a fixed seed whatever the thread count.
+    A versioned C interface lets other packages build models on top.
 License: MIT + file LICENSE
-Encoding: UTF-8
-Roxygen: list(markdown = TRUE)
-RoxygenNote: 8.1.0
+URL: https://github.com/pedrobtz/zulm, https://pedrobtz.github.io/zulm/
+BugReports: https://github.com/pedrobtz/zulm/issues
+Depends: 
+    R (>= 4.1)
+Imports: 
+    zujson,
+    zurand
 Suggests: 
-    testthat (>= 3.0.0)
+    nanoarrow,
+    testthat (>= 3.0.0),
+    withr
+LinkingTo: 
+    zurand
+Remotes: 
+    pedrobtz/zurand
 Config/testthat/edition: 3
-URL: https://pedrobtz.github.io/zulm/
+Encoding: UTF-8
+Language: en-GB
+Roxygen: list(markdown = TRUE)
+SystemRequirements: C++17
+Config/roxygen2/version: 8.1.0
