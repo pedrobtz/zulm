@@ -239,6 +239,21 @@ tr <- zl_trainer(g, zl_adamw(lr = 1e-3))
 for (i in seq_len(1000)) zl_step(tr, next_batch())  # noise: Philox
 ```
 
+**Acceptance (Stage 6, 2026-10-14).** `tests/testthat/test-acceptance.R`,
+run by the `acceptance` workflow, trains this model (with the flow
+head's noise drawn in the graph, `zl_noise_normal(c(7, 64, 16), "x0")`,
+and `x_t` and the velocity target computed there) on a synthetic marked
+process: four event kinds following a Markov chain that keeps its kind
+with probability 0.8–0.85, and seven targets that follow an AR(1),
+`y_t = 3 mu[, k_t] + 0.5 y_{t-1} + 0.1 e`, around a mean per kind; the
+features at each position are the previous event's one-hot kind and
+first four targets. Measured: mean loss 6.78 over steps 1–100 and 1.22
+over steps 901–1 000 (18 %), with reported losses and all parameters
+bit-identical at one and two threads, and eight Euler steps of the
+flow head giving finite values. (A first version of the process, with
+targets three times smaller and three times noisier, reached 67 %: most
+of its loss was the irreducible noise of flow matching.)
+
 Sampling integrates the learnt velocity field with a few Euler steps,
 each a call of `zl_forward()` on a forward-only graph of the head with
 the encoder's latent held fixed (§6.4).
@@ -715,6 +730,24 @@ zl_adaln(p, name, dim, cond_dim)         # function(x, cond):
                                          # x * (1 + scale) + shift
 zl_time_embedding(t, dim, max_period = 10000)   # no parameters
 ```
+
+**As built in Stage 6 (2026-10-14).** Parameter names: a linear is
+`<name>.weight` (`c(n_in, n_out)`) and `<name>.bias`, initialised
+uniformly on `(-1, 1) / sqrt(n_in)` as PyTorch does; an embedding is
+`<name>.weight` (`c(dim, n)`), N(0, 1), taking 0-based i32 indices of
+any shape (an i32 input may now be reshaped, and the index check
+follows the view to its input); a norm is `<name>.weight` (ones) and,
+for layer norms, `<name>.bias` (zeros); attention is the linears
+`<name>.q`, `.k`, `.v` and `.o` with biases; the MLP is `.gate`, `.up`
+and `.down`; the block is `.norm1`, `.attn`, `.norm2` and `.mlp`, with
+layer norms; AdaLN is two linears, `<name>.scale` and `<name>.shift`
+(not one linear split in halves, which would need a strided view).
+`zl_time_embedding()` concatenates `cos(t f)` and `sin(t f)`; its
+frequencies are a constant tensor, which graphs now hold in a buffer of
+their own, and `t` is repeated to the frequencies' width with
+`ggml_repeat_4d`. A sum of two losses that report per-row values
+(`ce + mse` in §1.1) reports the sum of both row sums, so the §1.1
+model's reported loss is thread-invariant too.
 
 ### 5.3 Operations on tensors
 
