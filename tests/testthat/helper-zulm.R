@@ -54,3 +54,55 @@ rand_array <- function(d, lo = -2, hi = 2) {
 expect_f32 <- function(object, expected, tol = 1e-5) {
   expect_equal(object, expected, tolerance = tol, ignore_attr = FALSE)
 }
+
+# Gradient check (design §11): builds loss = sum(f(params, inputs) * w) with
+# a fixed random weight w, and compares zl_grad() with central finite
+# differences of the f32 loss, for every parameter.
+grad_check <- function(f, params, inputs = list(), data = list(), h = 1e-2, tol = 2e-2) {
+  p <- zl_params()
+  for (nm in names(params)) {
+    v <- params[[nm]]
+    d <- if (is.null(dim(v))) length(v) else dim(v)
+    zl_param(p, nm, d, init = zl_init_zeros())
+    zl_param_set(p, nm, v)
+  }
+  probe <- zl_graph(function(x) f(x, p), p, c(inputs, list(.one = 1)))
+  out_dim <- dim(zl_forward(probe, c(data, list(.one = 1)))$output)
+  if (is.null(out_dim)) out_dim <- length(zl_forward(probe, c(data, list(.one = 1)))$output)
+  w <- rand_array(out_dim, -1, 1)
+  g <- zl_graph(
+    function(x) list(loss = zl_sum(f(x, p) * x$.w)),
+    p, c(inputs, list(.one = 1, .w = out_dim)), loss = "loss"
+  )
+  full <- c(data, list(.one = 1, .w = w))
+  tr <- zl_trainer(g, zl_sgd(lr = 1e-3))
+  loss_at <- function() zl_forward(g, full)$loss
+  for (nm in names(params)) {
+    loss_at()
+    got <- zl_grad(tr, nm)
+    v <- zl_param_get(p, nm)
+    fd <- v
+    for (k in seq_along(v)) {
+      up <- v
+      up[k] <- up[k] + h
+      zl_param_set(p, nm, up)
+      lp <- loss_at()
+      dn <- v
+      dn[k] <- dn[k] - h
+      zl_param_set(p, nm, dn)
+      lm <- loss_at()
+      fd[k] <- (lp - lm) / (2 * h)
+    }
+    zl_param_set(p, nm, v)
+    scale <- max(1, max(abs(fd)))
+    expect_lt(max(abs(as.vector(got) - as.vector(fd))) / scale, tol, label = sprintf("gradient of %s", nm))
+  }
+  invisible(TRUE)
+}
+
+# Softmax of each column (the first dimension), as zl_softmax() computes it.
+softmax_cols <- function(x) {
+  m <- matrix(x, dim(x)[1])
+  e <- exp(sweep(m, 2, apply(m, 2, max)))
+  array(sweep(e, 2, colSums(e), "/"), dim(x))
+}

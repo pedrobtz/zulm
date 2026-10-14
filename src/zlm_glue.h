@@ -28,6 +28,11 @@ enum {
 int zlm_guarded(void (*fn)(void *), void *data, char *msg, size_t msgsize);
 void zlm_abort_callback(const char *message);
 
+/* zlm_glue.c: the C memory held by live graphs and trainers, which R's
+   garbage collector cannot see (design §6.6); main thread only. */
+void zlm_live_add(double bytes);
+double zlm_live_get(void);
+
 /* The variant this shared object was built as (set by its R_init_). */
 extern const char *zlm_variant_name;
 

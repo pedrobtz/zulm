@@ -32,8 +32,11 @@
 #include "zlm_r.h"
 #include "zlm_store.h"
 
-#define ZLM_GRAPH_TENSORS 32768
-#define ZLM_GRAPH_NODES 16384
+/* build contexts: the first holds this many tensors, each next one twice
+   the last, up to ZLM_CTX_MAX; an operation needs room for ZLM_CTX_SLACK */
+#define ZLM_CTX_FIRST 256
+#define ZLM_CTX_MAX 65536
+#define ZLM_CTX_SLACK 32
 
 static SEXP graph_tag(void) {
   static SEXP tag = NULL;
@@ -49,17 +52,23 @@ static SEXP tensor_tag(void) {
 
 static void graph_free(zlm_graph *g) {
   if (g == NULL) return;
+  zlm_live_add(-g->bytes_live);
   if (g->galloc) ggml_gallocr_free(g->galloc);
   if (g->backend) ggml_backend_free(g->backend);
   if (g->buf_in) ggml_backend_buffer_free(g->buf_in);
   if (g->ctx_in) ggml_free(g->ctx_in);
   if (g->ctx) ggml_free(g->ctx);
+  for (int i = 0; i < g->n_ctx_full; i++) ggml_free(g->ctx_full[i]);
+  free(g->ctx_full);
+  if (g->ctx_graph) ggml_free(g->ctx_graph);
   if (g->ctx_fwd) ggml_free(g->ctx_fwd);
   free(g->out_fwd);
   free(g->in);
   free(g->in_rank);
   free(g->out);
   free(g->checks);
+  free(g->node_t);
+  free(g->node_c);
   free(g);
 }
 
@@ -100,6 +109,62 @@ static struct ggml_tensor *tensor_from(SEXP h, SEXP gptr) {
   return (struct ggml_tensor *) t;
 }
 
+SEXP zlm_graph_store_ptr(SEXP gptr) {
+  return VECTOR_ELT(R_ExternalPtrProtected(gptr), 0);
+}
+
+int zlm_graph_is_param(const zlm_graph *g, const struct ggml_tensor *t) {
+  for (int i = 0; i < g->store->n; i++) {
+    if (g->store->tensors[i] == t) return 1;
+  }
+  return 0;
+}
+
+/* Records `call` as the origin of every node created since the last call
+   (an operation may create several: a contiguous copy, a negation). */
+static void record_call(zlm_graph *g, SEXP gptr, SEXP call) {
+  SEXP prot = R_ExternalPtrProtected(gptr);
+  SEXP calls = VECTOR_ELT(prot, 1);
+  if (g->n_calls == Rf_length(calls)) {
+    calls = Rf_lengthgets(calls, 2 * Rf_length(calls));
+    SET_VECTOR_ELT(prot, 1, calls);
+  }
+  SET_VECTOR_ELT(calls, g->n_calls, call);
+  int c = g->n_calls++;
+  /* the operation's tensors are in the current context; if it took over
+     since the last call, they start at its beginning */
+  struct ggml_tensor *t = g->last_seen != NULL && g->last_seen_ctx == g->ctx
+                            ? ggml_get_next_tensor(g->ctx, g->last_seen)
+                            : ggml_get_first_tensor(g->ctx);
+  g->last_seen_ctx = g->ctx;
+  for (; t != NULL; t = ggml_get_next_tensor(g->ctx, t)) {
+    if (g->n_node == g->cap_node) {
+      int cap = g->cap_node ? 2 * g->cap_node : 64;
+      struct ggml_tensor **nt = (struct ggml_tensor **) realloc(g->node_t, (size_t) cap * sizeof *nt);
+      if (nt == NULL) return;
+      g->node_t = nt;
+      int *nc = (int *) realloc(g->node_c, (size_t) cap * sizeof *nc);
+      if (nc == NULL) return;
+      g->node_c = nc;
+      g->cap_node = cap;
+    }
+    g->node_t[g->n_node] = t;
+    g->node_c[g->n_node] = c;
+    g->n_node++;
+    g->last_seen = t;
+  }
+}
+
+/* The R call that created node `t`, or NULL. */
+SEXP zlm_graph_call_of(SEXP gptr, struct ggml_tensor *t) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  SEXP calls = VECTOR_ELT(R_ExternalPtrProtected(gptr), 1);
+  for (int k = 0; k < g->n_node; k++) {
+    if (g->node_t[k] == t) return VECTOR_ELT(calls, g->node_c[k]);
+  }
+  return R_NilValue;
+}
+
 /* ---- creation ------------------------------------------------------- */
 
 /* zl_graph(): a graph on store `sptr` with inputs of the given names,
@@ -130,7 +195,12 @@ SEXP zlm_graph_new(SEXP sptr, SEXP names, SEXP dims, SEXP types, SEXP max_bytes,
   if (g == NULL) {
     zlm_raise("zulm_memory_error", R_NilValue, "Out of memory creating a graph.");
   }
-  SEXP gptr = PROTECT(R_MakeExternalPtr(g, graph_tag(), sptr));
+  /* protected: list(store, calls), the store kept alive and the R call
+     of every operation, for errors */
+  SEXP prot = PROTECT(Rf_allocVector(VECSXP, 2));
+  SET_VECTOR_ELT(prot, 0, sptr);
+  SET_VECTOR_ELT(prot, 1, Rf_allocVector(VECSXP, 16));
+  SEXP gptr = PROTECT(R_MakeExternalPtr(g, graph_tag(), prot));
   R_RegisterCFinalizerEx(gptr, graph_finalize, TRUE);
   g->store = s;
   g->threads = Rf_asInteger(threads);
@@ -143,11 +213,7 @@ SEXP zlm_graph_new(SEXP sptr, SEXP names, SEXP dims, SEXP types, SEXP max_bytes,
   }
   struct ggml_init_params pin = { (size_t) (n + 1) * ggml_tensor_overhead(), NULL, true };
   g->ctx_in = ggml_init(pin);
-  struct ggml_init_params pc = {
-    (size_t) ZLM_GRAPH_TENSORS * ggml_tensor_overhead() +
-      ggml_graph_overhead_custom(ZLM_GRAPH_NODES, false),
-    NULL, true
-  };
+  struct ggml_init_params pc = { (size_t) ZLM_CTX_FIRST * ggml_tensor_overhead(), NULL, true };
   g->ctx = ggml_init(pc);
   if (g->ctx_in == NULL || g->ctx == NULL) {
     zlm_raise("zulm_memory_error", R_NilValue, "Out of memory creating a graph.");
@@ -167,7 +233,7 @@ SEXP zlm_graph_new(SEXP sptr, SEXP names, SEXP dims, SEXP types, SEXP max_bytes,
     ggml_backend_buffer_clear(g->buf_in, 0);
   }
   g->bytes_inputs = n > 0 ? (double) ggml_backend_buffer_get_size(g->buf_in) : 0;
-  UNPROTECT(1);
+  UNPROTECT(2);
   return gptr;
 }
 
@@ -226,7 +292,11 @@ static int is_half(const struct ggml_tensor *t) {
 
 /* Contiguous operands for every kernel that is not a pure view. */
 static struct ggml_tensor *cont(struct ggml_context *ctx, struct ggml_tensor *t) {
-  return ggml_is_contiguous(t) ? t : ggml_cont(ctx, t);
+  /* ggml_is_contiguous() passes a tensor whose first dimension is 1 whatever
+     its stride, as a transposed column has; kernels then assert that rows
+     are dense (nb[0] is the element size), which is fatal in compute */
+  int dense = ggml_is_contiguous(t) && t->nb[0] == ggml_type_size(t->type) && !ggml_is_transposed(t);
+  return dense ? t : ggml_cont(ctx, t);
 }
 
 static int can_repeat(const struct ggml_tensor *b, const struct ggml_tensor *a) {
@@ -236,8 +306,40 @@ static int can_repeat(const struct ggml_tensor *b, const struct ggml_tensor *a) 
   return 1;
 }
 
+/* Makes sure the build context has room for an operation's tensors (no
+   operation makes more than a few); otherwise a new one, twice as large,
+   takes over. Contexts are sized by use rather than for the largest graph,
+   since their memory is reserved whether used or not. Runs inside
+   zlm_guarded(), so it may not touch R. */
+static void ensure_room(zlm_graph *g) {
+  size_t over = ggml_tensor_overhead();
+  if (ggml_get_mem_size(g->ctx) - ggml_used_mem(g->ctx) >= (size_t) ZLM_CTX_SLACK * over) return;
+  if (g->n_ctx_full == g->cap_ctx_full) {
+    int cap = g->cap_ctx_full ? 2 * g->cap_ctx_full : 8;
+    struct ggml_context **c = (struct ggml_context **) realloc(g->ctx_full, (size_t) cap * sizeof *c);
+    if (c == NULL) GGML_ABORT("out of memory growing a graph");
+    g->ctx_full = c;
+    g->cap_ctx_full = cap;
+  }
+  size_t tensors = 2 * (ggml_get_mem_size(g->ctx) / over);
+  if (tensors > ZLM_CTX_MAX) tensors = ZLM_CTX_MAX;
+  struct ggml_init_params p = { tensors * over, NULL, true };
+  struct ggml_context *next = ggml_init(p);
+  if (next == NULL) GGML_ABORT("out of memory growing a graph");
+  g->ctx_full[g->n_ctx_full++] = g->ctx;
+  g->ctx = next;
+}
+
+/* Tensors made in the build contexts so far, at most. */
+static size_t build_tensors(const zlm_graph *g) {
+  size_t over = ggml_tensor_overhead(), n = ggml_used_mem(g->ctx) / over;
+  for (int i = 0; i < g->n_ctx_full; i++) n += ggml_used_mem(g->ctx_full[i]) / over;
+  return n;
+}
+
 static void op_body(void *data) {
   zlm_opjob *j = (zlm_opjob *) data;
+  ensure_room(j->g);
   struct ggml_context *ctx = j->g->ctx;
   const char *op = j->op;
   struct ggml_tensor *a = j->a, *b = j->b;
@@ -270,9 +372,16 @@ static void op_body(void *data) {
   } else if (strcmp(op, "scale_bias") == 0) {
     r = ggml_scale_bias(ctx, cont(ctx, a), (float) j->p[0], (float) j->p[1]);
   } else if (strcmp(op, "fill_div") == 0) {
-    /* number / tensor */
+    /* number / tensor: c as 0 x + c, so the graph keeps a gradient (ggml's
+       FILL has none); an infinite x gives NaN rather than 0 */
     struct ggml_tensor *x = cont(ctx, a);
-    r = ggml_div(ctx, ggml_fill(ctx, x, (float) j->p[0]), x);
+    r = ggml_div(ctx, ggml_scale_bias(ctx, x, 0.0f, (float) j->p[0]), x);
+  } else if (strcmp(op, "mean") == 0) {
+    /* only through "unchecked:", for the patch P1 regression test */
+    r = ggml_mean(ctx, a);
+  } else if (strcmp(op, "sub_raw") == 0) {
+    /* only through "unchecked:", for the patch P2 regression test */
+    r = ggml_sub(ctx, a, b);
   } else if (strcmp(op, "sum") == 0) {
     r = ggml_sum(ctx, cont(ctx, a));
   } else if (strcmp(op, "sum_rows") == 0) {
@@ -411,6 +520,10 @@ static void validate(zlm_opjob *j, SEXP call) {
     if (a->type != GGML_TYPE_F32 && !is_half(a)) type_error(op, a);
     return;
   }
+  if (strcmp(op, "rms_norm") == 0 && !(j->p[0] >= 0 && j->p[0] < 1e30)) {
+    /* the kernel asserts eps >= 0 during compute, where it is fatal */
+    zlm_raise("zulm_invalid_argument", R_NilValue, "rms_norm's eps must be a non-negative number.");
+  }
   if (strcmp(op, "rope") == 0) {
     need_f32(op, a);
     if (b->type != GGML_TYPE_I32) {
@@ -494,6 +607,7 @@ SEXP zlm_op(SEXP gptr, SEXP op, SEXP ha, SEXP hb, SEXP num, SEXP ints, SEXP call
     zlm_raise(status == ZLM_STATUS_MEMORY ? "zulm_memory_error" : "zulm_internal_error", R_NilValue,
               "Building %s failed: %s", j.op, msg[0] ? msg : "unknown operation");
   }
+  record_call(g, gptr, call);
   if (strcmp(j.op, "get_rows") == 0) {
     if (g->n_checks == g->cap_checks) {
       int cap = g->cap_checks ? 2 * g->cap_checks : 8;
@@ -520,13 +634,19 @@ struct finish_job {
 static void finish_body(void *data) {
   struct finish_job *f = (struct finish_job *) data;
   zlm_graph *g = f->g;
-  g->gf = ggml_new_graph_custom(g->ctx, ZLM_GRAPH_NODES, false);
+  /* every node and leaf of gf is a tensor of the build contexts, an input
+     or a parameter; the graph is sized for all of them */
+  size_t size = build_tensors(g) + (size_t) g->n_in + (size_t) g->store->n + 64;
+  struct ggml_init_params pg = { ggml_graph_overhead_custom(size, false), NULL, true };
+  g->ctx_graph = ggml_init(pg);
+  if (g->ctx_graph == NULL) GGML_ABORT("out of memory finishing a graph");
+  g->gf = ggml_new_graph_custom(g->ctx_graph, size, false);
   for (int i = 0; i < f->n; i++) {
     ggml_set_output(f->outs[i]);
     ggml_build_forward_expand(g->gf, f->outs[i]);
   }
   /* the copy zl_forward() evaluates */
-  g->gf_fwd = zlm_graph_dup(g->ctx_fwd, g->gf, f->n, f->outs, g->out_fwd);
+  g->gf_fwd = zlm_graph_dup(g->ctx_fwd, g->gf, f->n, f->outs, g->out_fwd, 0, 0);
 }
 
 /* Ends build(): flags and records the outputs, then allocates the
@@ -553,10 +673,11 @@ SEXP zlm_graph_finish(SEXP gptr, SEXP outputs) {
   struct finish_job f = { g, n, g->out };
   char msg[2048] = "";
   g->out_fwd = (struct ggml_tensor **) calloc((size_t) (n > 0 ? n : 1), sizeof *g->out_fwd);
+  /* the forward copy holds a tensor per node and leaf of gf, which has at
+     most this many */
+  size_t fsize = build_tensors(g) + (size_t) n + (size_t) g->n_in + (size_t) g->store->n + 64;
   struct ggml_init_params pf = {
-    (size_t) ZLM_GRAPH_TENSORS * ggml_tensor_overhead() +
-      ggml_graph_overhead_custom(ZLM_GRAPH_NODES, false),
-    NULL, true
+    fsize * ggml_tensor_overhead() + ggml_graph_overhead_custom(fsize, false), NULL, true
   };
   g->ctx_fwd = ggml_init(pf);
   if (g->out_fwd == NULL || g->ctx_fwd == NULL) {
@@ -604,6 +725,10 @@ SEXP zlm_graph_finish(SEXP gptr, SEXP outputs) {
     zlm_raise("zulm_internal_error", R_NilValue, "ggml's CPU backend could not start.");
   }
   ggml_backend_cpu_set_n_threads(g->backend, g->threads > 0 ? g->threads : 1);
+  g->bytes_live = g->bytes_compute + g->bytes_inputs + (double) ggml_get_mem_size(g->ctx) +
+                  (double) ggml_get_mem_size(g->ctx_fwd) + (double) ggml_get_mem_size(g->ctx_graph);
+  for (int i = 0; i < g->n_ctx_full; i++) g->bytes_live += (double) ggml_get_mem_size(g->ctx_full[i]);
+  zlm_live_add(g->bytes_live);
   g->state = ZLM_GRAPH_READY;
   SEXP handles = PROTECT(Rf_allocVector(VECSXP, n));
   for (int i = 0; i < n; i++) SET_VECTOR_ELT(handles, i, tensor_wrap(gptr, g->out[i]));
@@ -667,10 +792,8 @@ SEXP zlm_graph_set_input(SEXP gptr, SEXP index, SEXP values) {
   return R_NilValue;
 }
 
-/* Runs the graph once; returns the requested outputs as doubles. */
-SEXP zlm_graph_compute(SEXP gptr, SEXP which) {
-  zlm_graph *g = zlm_graph_from(gptr);
-  need_ready(g);
+/* Every index input must lie within its table before a kernel reads it. */
+void zlm_graph_check_indices(zlm_graph *g) {
   for (int c = 0; c < g->n_checks; c++) {
     const zlm_index_check *k = &g->checks[c];
     const int32_t *v = (const int32_t *) k->idx->data;
@@ -683,6 +806,19 @@ SEXP zlm_graph_compute(SEXP gptr, SEXP which) {
       }
     }
   }
+}
+
+/* The original node of output i, for training on it. */
+SEXP zlm_graph_output(SEXP gptr, SEXP index) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  return R_MakeExternalPtr(g->out[Rf_asInteger(index)], R_NilValue, gptr);
+}
+
+/* Runs the graph once; returns the requested outputs as doubles. */
+SEXP zlm_graph_compute(SEXP gptr, SEXP which) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  need_ready(g);
+  zlm_graph_check_indices(g);
   enum ggml_status st = ggml_backend_graph_compute(g->backend, g->gf_fwd);
   if (st != GGML_STATUS_SUCCESS) {
     zlm_raise("zulm_internal_error", R_NilValue, "ggml failed to compute the graph (status %d).", (int) st);

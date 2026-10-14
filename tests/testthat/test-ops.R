@@ -238,12 +238,6 @@ test_that("where, clamp and tri match R", {
   expect_identical(out$ups, tri(x, upper.tri(x[, , 1])))
 })
 
-softmax_cols <- function(x) {
-  m <- matrix(x, dim(x)[1])
-  e <- exp(sweep(m, 2, apply(m, 2, max)))
-  array(sweep(e, 2, colSums(e), "/"), dim(x))
-}
-
 test_that("softmax matches R with masks of every broadcast shape", {
   withr::local_seed(19)
   d <- c(5, 4, 3, 2)
@@ -365,4 +359,31 @@ test_that("parameters, inputs and views can be outputs", {
   expect_identical(out$w, matrix(1, 2, 3))
   expect_identical(out$a, matrix(as.double(1:6), 2))
   expect_identical(out$t, t(matrix(as.double(1:6), 2)))
+})
+
+test_that("crossprod takes a transposed vector, as one-position attention makes", {
+  x <- rand_array(c(3, 1))
+  y <- rand_array(c(1, 4))
+  out <- run_graph(function(i) zl_crossprod(zl_t(i$x), i$y), list(x = c(3, 1), y = c(1, 4)), list(x = x, y = y))
+  expect_f32(out$output, t(t(x)) %*% y)
+})
+
+test_that("NaN flows through the kernels instead of stopping R", {
+  # ggml's debug assert() in softmax aborted the session before NDEBUG was
+  # defined for the vendored sources
+  out <- run_graph(function(i) zl_softmax(i$x), list(x = 3), list(x = c(NaN, 1, 2)))
+  expect_true(all(is.nan(out$output)))
+  out <- run_graph(function(i) zl_rms_norm(i$x), list(x = 3), list(x = c(NaN, 1, 2)))
+  expect_true(all(is.nan(out$output)))
+})
+
+test_that("a transposed column enters every kernel as dense rows", {
+  # ggml counted it contiguous, and binary kernels asserted on its stride
+  x <- rand_array(c(3, 1))
+  y <- rand_array(c(1, 3))
+  out <- run_graph(function(i) list(add = zl_t(i$x) + i$y, mul = zl_t(i$x) * i$y, exp = zl_exp(zl_t(i$x))),
+                   list(x = c(3, 1), y = c(1, 3)), list(x = x, y = y))
+  expect_f32(out$add, t(x) + y)
+  expect_f32(out$mul, t(x) * y)
+  expect_f32(out$exp, exp(t(x)))
 })

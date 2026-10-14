@@ -16,8 +16,14 @@ RELU, DIV and MUL, whose CPU kernels do not depend on the thread count.
 The step kernels require exactly 7 (AdamW) and 2 (SGD) parameters, so
 the clip value has a tensor of its own rather than an eighth element.
 
---- a/include/ggml-opt.h	2026-10-14 08:19:14
-+++ b/include/ggml-opt.h	2026-10-14 08:19:31
+A gradient can be a view, for a parameter used through ggml_permute()
+or ggml_transpose(); the step kernels read it with the weight's strides,
+which then updates the wrong elements. The product with the scale, and
+a ggml_cont() before it where needed, makes every gradient the step
+reads contiguous.
+
+--- a/include/ggml-opt.h	2026-10-14 09:34:31
++++ b/include/ggml-opt.h	2026-10-14 09:34:32
 @@ -94,6 +94,7 @@
              float alpha; // learning rate
              float wd;    // weight decay
@@ -26,8 +32,8 @@ the clip value has a tensor of its own rather than an eighth element.
      };
  
      // callback to calculate optimizer parameters prior to a backward pass
---- a/src/ggml-opt.cpp	2026-10-14 08:19:14
-+++ b/src/ggml-opt.cpp	2026-10-14 08:19:47
+--- a/src/ggml-opt.cpp	2026-10-14 09:34:31
++++ b/src/ggml-opt.cpp	2026-10-14 09:34:32
 @@ -67,6 +67,7 @@
      ggml_opt_get_optimizer_params get_opt_pars    = nullptr;
      void *                        get_opt_pars_ud = nullptr;
@@ -55,7 +61,7 @@ the clip value has a tensor of its own rather than an eighth element.
          struct ggml_init_params params = {
              /*.mem_size   =*/ size_meta,
              /*.mem_buffer =*/ nullptr,
-@@ -508,10 +512,37 @@
+@@ -508,6 +512,38 @@
      ggml_set_input(adamw_params);
      const char * optimizer_name = ggml_opt_optimizer_name(opt_ctx->optimizer);
      ggml_format_name(adamw_params, "%s_params", optimizer_name);
@@ -69,10 +75,15 @@ the clip value has a tensor of its own rather than an eighth element.
 +    ggml_set_input(opt_ctx->opt_clip_params);
 +    ggml_set_name(opt_ctx->opt_clip_params, "grad_clip_params");
 +    struct ggml_tensor * grad_sumsq = nullptr;
-     for (int i = opt_ctx->gf->n_nodes-1; i >= 0; --i) {
-         struct ggml_tensor * node = opt_ctx->gb_opt->nodes[i];
-         struct ggml_tensor * grad = ggml_graph_get_grad(opt_ctx->gb_opt, node);
++    for (int i = opt_ctx->gf->n_nodes-1; i >= 0; --i) {
++        struct ggml_tensor * node = opt_ctx->gb_opt->nodes[i];
++        struct ggml_tensor * grad = ggml_graph_get_grad(opt_ctx->gb_opt, node);
 +        if (grad && (node->flags & GGML_TENSOR_FLAG_PARAM)) {
++            // a gradient can be a view (of a permuted parameter, say): the
++            // kernels below need contiguous rows
++            if (!ggml_is_contiguous(grad)) {
++                grad = ggml_cont(opt_ctx->ctx_compute, grad);
++            }
 +            struct ggml_tensor * sumsq = ggml_sum(opt_ctx->ctx_compute, ggml_sqr(opt_ctx->ctx_compute, grad));
 +            grad_sumsq = grad_sumsq ? ggml_add(opt_ctx->ctx_compute, grad_sumsq, sumsq) : sumsq;
 +        }
@@ -85,25 +96,23 @@ the clip value has a tensor of its own rather than an eighth element.
 +        clip_scale = ggml_div(opt_ctx->ctx_compute, clip, ggml_add(opt_ctx->ctx_compute, clip, excess));
 +        ggml_set_name(clip_scale, "grad_clip_scale");
 +    }
- 
-+    for (int i = opt_ctx->gf->n_nodes-1; i >= 0; --i) {
-+        struct ggml_tensor * node = opt_ctx->gb_opt->nodes[i];
-+        struct ggml_tensor * grad = ggml_graph_get_grad(opt_ctx->gb_opt, node);
 +
-         if (grad && (node->flags & GGML_TENSOR_FLAG_PARAM)) {
-             struct ggml_tensor * m = nullptr;
-             struct ggml_tensor * v = nullptr;
-@@ -521,6 +552,9 @@
+     for (int i = opt_ctx->gf->n_nodes-1; i >= 0; --i) {
+         struct ggml_tensor * node = opt_ctx->gb_opt->nodes[i];
+         struct ggml_tensor * grad = ggml_graph_get_grad(opt_ctx->gb_opt, node);
+@@ -520,6 +556,11 @@
+                 v = opt_ctx->grad_v[i];
                  ggml_format_name(m, "AdamW m for %s", node->name);
                  ggml_format_name(v, "AdamW v for %s", node->name);
-             }
-+            if (clip_scale) {
-+                grad = ggml_mul(opt_ctx->ctx_compute, grad, clip_scale);
 +            }
++            if (clip_scale) {
++                // the step kernels read the gradient with the weight's
++                // strides, so it must be contiguous: the product is
++                grad = ggml_mul(opt_ctx->ctx_compute, ggml_is_contiguous(grad) ? grad : ggml_cont(opt_ctx->ctx_compute, grad), clip_scale);
+             }
              struct ggml_tensor * opt_step;
              switch (optimizer) {
-                 case GGML_OPT_OPTIMIZER_TYPE_ADAMW:
-@@ -819,6 +853,9 @@
+@@ -819,6 +860,9 @@
              default:
                  GGML_ABORT("fatal error");
          }

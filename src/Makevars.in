@@ -9,11 +9,13 @@ CXX_STD = CXX17
 
 # -I. finds zulm's headers, -Iggml/... the vendored tree (design §9.1).
 # GGML_USE_CPU_REPACK and GGML_SCHED_MAX_COPIES as upstream's CMake sets
-# them; GGML_USE_LLAMAFILE for llamafile's matrix kernels, 2.5-4x the plain
+# them; GGML_SCHED_MAX_SPLIT_INPUTS=4, since the one CPU backend copies no
+# split inputs and the scheduler reserves graph size x this x 2 tensors; GGML_USE_LLAMAFILE for llamafile's matrix kernels, 2.5-4x the plain
 # ones and thread-invariant (design §13.1, question 7); -pthread where
 # ggml's thread pool needs it (WRE §1.2.1 allows it in PKG_CPPFLAGS).
 PKG_CPPFLAGS = -I. -Iggml/include -Iggml/src -Iggml/src/ggml-cpu \
-  -DGGML_USE_CPU_REPACK -DGGML_USE_LLAMAFILE -DGGML_SCHED_MAX_COPIES=4 -pthread
+  -DGGML_USE_CPU_REPACK -DGGML_USE_LLAMAFILE -DGGML_SCHED_MAX_COPIES=4 \
+  -DGGML_SCHED_MAX_SPLIT_INPUTS=4 -pthread
 
 # ZULM_CFLAGS and ZULM_CXXFLAGS are the opt-in native-build hooks: make
 # reads them from the environment, and they are empty unless the user sets

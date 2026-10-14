@@ -128,3 +128,18 @@ zlm_max_bytes <- function() {
   }
   as.double(cap)
 }
+
+# Graphs and trainers hold memory outside R's heap, which R's garbage
+# collector does not count, so unreferenced ones could pile up between
+# collections (design §6.6). Before building another, collect when the
+# memory they hold has doubled since the last collection and passed 128 MB.
+zlm_maybe_gc <- function() {
+  live <- zlm_call("zlm_live_bytes")
+  after <- if (is.null(.zlm$live_after_gc)) 0 else .zlm$live_after_gc
+  floor <- max(128 * 2^20, 2 * after)
+  if (live > floor) {
+    gc(verbose = FALSE, full = TRUE)
+    .zlm$live_after_gc <- zlm_call("zlm_live_bytes")
+  }
+  invisible(live)
+}

@@ -1,8 +1,11 @@
 Package: zulm
 Title: Tensor Graphs, Training and Inference on 'ggml'
 Version: 0.0.0.9000
-Authors@R: 
-    person("Pedro", "Baltazar", , "pedrobtz@gmail.com", role = c("aut", "cre", "cph"))
+Authors@R: c(
+    person("Pedro", "Baltazar", , "pedrobtz@gmail.com", role = c("aut", "cre", "cph")),
+    person("The ggml authors", role = "cph",
+           comment = "Bundled 'ggml' library; see inst/COPYRIGHTS")
+  )
 Description: Builds computation graphs of tensors in R, runs them on the
     CPU, differentiates them and trains their parameters, through the
     'ggml' tensor library (<https://github.com/ggml-org/ggml>) bundled in

@@ -1,0 +1,8 @@
+zulm bundles code from the following projects. Their copyright holders
+are listed in the Authors@R field of DESCRIPTION.
+
+src/ggml/
+  The CPU subset of ggml v0.26.0 (https://github.com/ggml-org/ggml),
+  with the patches listed in src/ggml/VERSION.
+  Copyright (c) 2023-2026 The ggml authors.
+  MIT License; the full text is in src/ggml/LICENSE.

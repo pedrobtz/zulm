@@ -227,3 +227,20 @@ SEXP zlm_bench_mul_mat(SEXP n_, SEXP reps_, SEXP threads_) {
   UNPROTECT(1);
   return out;
 }
+
+/* ---- memory outside R's heap (design §6.6) ---------------------------- */
+
+static double zlm_live = 0;
+
+void zlm_live_add(double bytes) {
+  zlm_live += bytes;
+  if (zlm_live < 0) zlm_live = 0;
+}
+
+double zlm_live_get(void) {
+  return zlm_live;
+}
+
+SEXP zlm_live_bytes(void) {
+  return Rf_ScalarReal(zlm_live);
+}

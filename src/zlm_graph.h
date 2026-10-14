@@ -20,7 +20,14 @@ typedef struct zlm_graph {
   struct ggml_context *ctx_in;  /* inputs, with a buffer of their own */
   ggml_backend_buffer_t buf_in;
   struct ggml_context *ctx;     /* nodes built by build(); never allocated,
-                                   so ggml-opt can train on them (§4) */
+                                   so ggml-opt can train on them (§4). The
+                                   context being filled: when it runs out of
+                                   room another, twice as large, takes over,
+                                   and the full ones are kept in ctx_full */
+  struct ggml_context **ctx_full;
+  int n_ctx_full, cap_ctx_full;
+  struct ggml_context *last_seen_ctx; /* the context of last_seen */
+  struct ggml_context *ctx_graph; /* gf itself, sized when finished */
   struct ggml_cgraph *gf;
   struct ggml_context *ctx_fwd; /* the copy zl_forward() evaluates */
   struct ggml_cgraph *gf_fwd;
@@ -34,9 +41,17 @@ typedef struct zlm_graph {
   int n_out;
   zlm_index_check *checks;
   int n_checks, cap_checks;
+  /* the R call that made each node, for errors (design §6.2): node
+     node_t[k] came from call node_c[k] of the list in the graph's
+     protected value */
+  struct ggml_tensor **node_t;
+  int *node_c;
+  int n_node, cap_node, n_calls;
+  struct ggml_tensor *last_seen;
   int state;
   int threads;
   double max_bytes, bytes_inputs, bytes_compute;
+  double bytes_live; /* counted in zlm_live_add() until freed */
 } zlm_graph;
 
 zlm_graph *zlm_graph_from(SEXP x);
@@ -45,12 +60,14 @@ zlm_graph *zlm_graph_from(SEXP x);
 extern "C" {
 #endif
 struct ggml_cgraph *zlm_graph_dup(struct ggml_context *ctx, struct ggml_cgraph *src, int n,
-                                  struct ggml_tensor **map_in, struct ggml_tensor **map_out);
+                                  struct ggml_tensor **map_in, struct ggml_tensor **map_out,
+                                  int size, int grads);
 #ifdef __cplusplus
 }
 #endif
 
 SEXP zlm_graph_new(SEXP sptr, SEXP names, SEXP dims, SEXP types, SEXP max_bytes, SEXP threads);
+SEXP zlm_live_bytes(void);
 SEXP zlm_graph_free_(SEXP x);
 SEXP zlm_graph_inputs(SEXP gptr);
 SEXP zlm_graph_param(SEXP gptr, SEXP name);
@@ -61,5 +78,10 @@ SEXP zlm_graph_abandon(SEXP gptr);
 SEXP zlm_graph_set_input(SEXP gptr, SEXP index, SEXP values);
 SEXP zlm_graph_compute(SEXP gptr, SEXP which);
 SEXP zlm_graph_info(SEXP gptr);
+SEXP zlm_graph_call_of(SEXP gptr, struct ggml_tensor *t);
+void zlm_graph_check_indices(zlm_graph *g);
+SEXP zlm_graph_output(SEXP gptr, SEXP index);
+SEXP zlm_graph_store_ptr(SEXP gptr);
+int zlm_graph_is_param(const zlm_graph *g, const struct ggml_tensor *t);
 
 #endif
