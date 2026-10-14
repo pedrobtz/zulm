@@ -1,6 +1,7 @@
 # Stage 1 measurements (design §12, §13.1): the variant scheme against
 # flag-built references, the unrolling pragma against -funroll-loops,
-# llamafile kernels on and off, install time and size. Informational: the
+# llamafile kernels (on in the shipped build) against the plain ones,
+# install time and size. Informational: the
 # numbers go to the job summary and into the design by hand.
 on:
   pull_request:
@@ -76,12 +77,12 @@ jobs:
             R CMD INSTALL --preclean . > install-unroll.log 2>&1 || { tail -50 install-unroll.log; exit 1; }
             Rscript tools/bench-variants.R mavx2-funroll-loops
           fi
-      - name: llamafile kernels on
+      - name: plain kernels (llamafile off)
         shell: bash
         run: |
           mkdir -p ~/.R
           # Windows reads ~/.R/Makevars.win, the others ~/.R/Makevars.
-          echo 'CPPFLAGS += -DGGML_USE_LLAMAFILE' >> ~/.R/Makevars
-          echo 'CPPFLAGS += -DGGML_USE_LLAMAFILE' >> ~/.R/Makevars.win
-          R CMD INSTALL --preclean . > install-llamafile.log 2>&1 || { tail -50 install-llamafile.log; exit 1; }
-          Rscript tools/bench-variants.R llamafile
+          echo 'CPPFLAGS += -UGGML_USE_LLAMAFILE' >> ~/.R/Makevars
+          echo 'CPPFLAGS += -UGGML_USE_LLAMAFILE' >> ~/.R/Makevars.win
+          R CMD INSTALL --preclean . > install-plain.log 2>&1 || { tail -50 install-plain.log; exit 1; }
+          Rscript tools/bench-variants.R plain
