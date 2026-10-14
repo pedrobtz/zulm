@@ -125,6 +125,9 @@ zl_trainer <- function(g, opt, accumulate = 1L, clip_norm = NULL) {
   if (is.null(g$loss)) {
     zlm_abort("The graph has no `loss`; give zl_graph() one to train.", "zulm_invalid_argument")
   }
+  if (zlm_call("zlm_graph_info", g$ptr)[[5L]] > 0L) {
+    zlm_abort("A graph that writes state tensors is for inference; it cannot be trained.", "zulm_invalid_argument")
+  }
   if (!inherits(opt, "zl_optimizer")) {
     zlm_abort("`opt` must come from zl_adamw() or zl_sgd().", "zulm_invalid_argument")
   }

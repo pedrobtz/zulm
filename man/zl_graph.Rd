@@ -32,7 +32,8 @@ returns; \code{NULL} for all.}
 
 \item{...}{Dimensions, for \code{zl_int()}.}
 
-\item{g}{A graph.}
+\item{g}{A graph; for \code{zl_forward()}, also a graph cache from
+\code{\link[=zl_graph_cache]{zl_graph_cache()}}.}
 
 \item{data}{A named list of arrays, one per input, each matching its
 input's dimensions exactly (a plain vector for a one-dimensional

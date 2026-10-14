@@ -54,7 +54,8 @@ storage types, named by parameter.}
 \code{zl_param_set()} return the store invisibly. \code{zl_param_get()} returns
 a double vector or array; \code{zl_param_names()} the names in the order
 added; \code{zl_param_count()} the total number of values;
-\code{zl_param_tensor()} a handle for use when building a graph.
+\code{zl_param_tensor()} a handle for use when building a graph, for a
+parameter or a state tensor (\code{\link[=zl_state]{zl_state()}}).
 }
 \description{
 A parameter store holds named tensors of up to four dimensions. Its

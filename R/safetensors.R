@@ -85,7 +85,7 @@ zl_load_safetensors <- function(p, path, map = NULL) {
     target <- unname(map[tn])
   }
   info <- zlm_call("zlm_store_info", p$ptr)
-  use <- which(!is.na(target) & target %in% info$names)
+  use <- which(!is.na(target) & target %in% info$names[!info$state])
   if (length(use) == 0L) {
     zlm_abort("No tensor of the file matches a parameter of the store.", "zulm_invalid_argument")
   }
@@ -126,7 +126,7 @@ zl_save_safetensors <- function(p, path, type = c("f32", "f16", "bf16"), metadat
   hdr <- list()
   if (length(metadata)) hdr[["__metadata__"]] <- lapply(metadata, enc2utf8)
   off <- 0
-  for (i in seq_along(info$names)) {
+  for (i in which(!info$state)) {
     n <- prod(info$dims[[i]]) * size
     hdr[[info$names[[i]]]] <- list(dtype = dtype, shape = I(rev(info$dims[[i]])), data_offsets = I(c(off, off + n)))
     off <- off + n

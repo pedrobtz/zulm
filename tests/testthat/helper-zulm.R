@@ -124,3 +124,8 @@ local_threads <- function(n, envir = parent.frame()) {
   withr::defer(zl_threads(old), envir = envir)
   invisible(old)
 }
+
+# The bytes a store's tensors take.
+zlm_store_bytes <- function(p) {
+  getFromNamespace("zlm_call", "zulm")("zlm_store_info", p$ptr)$bytes
+}

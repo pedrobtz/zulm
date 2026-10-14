@@ -260,6 +260,7 @@ SEXP zlm_st_write(SEXP sptr, SEXP path, SEXP header, SEXP type) {
   int ok = fwrite(len, 1, 8, f) == 8 && fwrite(hdr, 1, (size_t) n, f) == (size_t) n;
   for (int t = 0; t < s->n && ok; t++) {
     struct ggml_tensor *src = s->tensors[t];
+    if (s->kinds[t] != ZLM_KIND_PARAM) continue;
     int64_t m = ggml_nelements(src);
     if (src->type == to) {
       ok = fwrite(src->data, 1, ggml_nbytes(src), f) == ggml_nbytes(src);

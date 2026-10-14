@@ -55,6 +55,7 @@ static void store_free(zlm_store *s) {
   free(s->batches);
   free(s->tensors);
   free(s->ranks);
+  free(s->kinds);
   free(s);
 }
 
@@ -97,6 +98,11 @@ static int store_reserve(zlm_store *s, int extra) {
       return 0;
     }
     s->ranks = r;
+    unsigned char *k = (unsigned char *) realloc(s->kinds, (size_t) cap);
+    if (k == NULL) {
+      return 0;
+    }
+    s->kinds = k;
     s->cap = cap;
   }
   if (s->n_batches + 1 > s->cap_batches) {
@@ -325,6 +331,7 @@ static int store_add_batch(zlm_store *s, int count, const char **names,
   for (struct ggml_tensor *t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
     s->tensors[s->n] = t;
     s->ranks[s->n] = ranks[i++];
+    s->kinds[s->n] = ZLM_KIND_PARAM;
     s->n++;
   }
   s->bytes += (double) ggml_backend_buffer_get_size(buf);
@@ -383,7 +390,7 @@ SEXP zlm_store_free_(SEXP ptr) {
 }
 
 /* zl_param(): adds one tensor, filled from `values` (or zeros if NULL). */
-SEXP zlm_store_add(SEXP ptr, SEXP name, SEXP dims, SEXP type, SEXP values, SEXP max_bytes) {
+SEXP zlm_store_add(SEXP ptr, SEXP name, SEXP dims, SEXP type, SEXP values, SEXP max_bytes, SEXP kind) {
   zlm_store *s = zlm_store_from(ptr);
   const char *nm = store_name(name);
   if (zlm_store_find(s, nm) != NULL) {
@@ -397,6 +404,7 @@ SEXP zlm_store_add(SEXP ptr, SEXP name, SEXP dims, SEXP type, SEXP values, SEXP 
     check_values(values, n, "The initial value");
   }
   int idx = store_add_batch(s, 1, &nm, ne, &rank, &tp, Rf_asReal(max_bytes), "The parameter");
+  s->kinds[idx] = (unsigned char) Rf_asInteger(kind);
   struct ggml_tensor *t = s->tensors[idx];
   if (Rf_isNull(values)) {
     memset(t->data, 0, ggml_nbytes(t));
@@ -438,10 +446,91 @@ SEXP zlm_store_set(SEXP ptr, SEXP name, SEXP values) {
   return R_NilValue;
 }
 
+static struct ggml_tensor *find_state(const zlm_store *s, const char *name) {
+  for (int i = 0; i < s->n; i++) {
+    if (s->kinds[i] == ZLM_KIND_STATE && strcmp(s->tensors[i]->name, name) == 0) return s->tensors[i];
+  }
+  return NULL;
+}
+
+int zlm_api_state_shape(const zlm_store *s, const char *name, int64_t ne[4], int *type) {
+  const struct ggml_tensor *t = s == NULL || name == NULL ? NULL : find_state(s, name);
+  if (t == NULL) return 1;
+  for (int k = 0; k < 4; k++) ne[k] = t->ne[k];
+  if (type != NULL) *type = (int) t->type;
+  return 0;
+}
+
+int zlm_api_state_read_f32(const zlm_store *s, const char *name, float *dst, int64_t n) {
+  const struct ggml_tensor *t = s == NULL || name == NULL ? NULL : find_state(s, name);
+  if (t == NULL) return 1;
+  if (t->type != GGML_TYPE_F32 || n != ggml_nelements(t) || (n > 0 && dst == NULL)) return 2;
+  if (n > 0) memcpy(dst, t->data, (size_t) n * sizeof(float));
+  return 0;
+}
+
+int zlm_api_state_write_f32_at(zlm_store *s, const char *name, int64_t offset, const float *src, int64_t n) {
+  struct ggml_tensor *t = s == NULL || name == NULL ? NULL : find_state(s, name);
+  if (t == NULL) return 1;
+  if (t->type != GGML_TYPE_F32) return 2;
+  if (offset < 0 || n < 0 || offset > ggml_nelements(t) - n || (n > 0 && src == NULL)) return 3;
+  if (n > 0) memcpy((float *) t->data + offset, src, (size_t) n * sizeof(float));
+  return 0;
+}
+
+/* zl_state_set(offset =): n values written at flat element offset of a
+   state tensor (design §6.9), through the C table's member. */
+SEXP zlm_state_write_at(SEXP ptr, SEXP name, SEXP offset, SEXP values) {
+  zlm_store *s = zlm_store_from(ptr);
+  const char *nm = store_name(name);
+  double off = Rf_asReal(offset);
+  R_xlen_t n = Rf_xlength(values);
+  check_values(values, n, "`value`");
+  float *buf = n > 0 ? (float *) R_alloc((size_t) n, sizeof(float)) : NULL;
+  R_xlen_t over = n > 0 ? to_f32(values, buf, n) : 0;
+  int rc = ISNAN(off) || off < 0 || off > 9e15 ? 3 : zlm_api_state_write_f32_at(s, nm, (int64_t) off, buf, (int64_t) n);
+  if (rc == 1) zlm_raise("zulm_invalid_argument", R_NilValue, "The store has no state '%s'.", nm);
+  if (rc == 2) zlm_raise("zulm_type_error", R_NilValue, "State '%s' is not f32.", nm);
+  if (rc == 3) {
+    struct ggml_tensor *t = zlm_store_find(s, nm);
+    zlm_raise("zulm_invalid_argument", R_NilValue,
+              "Writing %lld values at offset %.0f reaches outside state '%s', which holds %lld.",
+              (long long) n, off, nm, (long long) ggml_nelements(t));
+  }
+  if (over > 0) zlm_warn_range(over, nm);
+  return R_NilValue;
+}
+
+/* One tensor's list(dim, type, state), or NULL when the store has no
+   tensor of that name: what zl_param_tensor() needs, without listing the
+   whole store. */
+SEXP zlm_store_tensor_info(SEXP ptr, SEXP name) {
+  zlm_store *s = zlm_store_from(ptr);
+  const char *nm = Rf_translateCharUTF8(STRING_ELT(name, 0));
+  for (int i = 0; i < s->n; i++) {
+    struct ggml_tensor *t = s->tensors[i];
+    if (strcmp(t->name, nm) != 0) continue;
+    SEXP out = PROTECT(Rf_allocVector(VECSXP, 3));
+    SEXP d = Rf_allocVector(REALSXP, s->ranks[i]);
+    SET_VECTOR_ELT(out, 0, d);
+    for (int k = 0; k < s->ranks[i]; k++) REAL(d)[k] = (double) t->ne[k];
+    SET_VECTOR_ELT(out, 1, Rf_mkString(zlm_type_name(t->type)));
+    SET_VECTOR_ELT(out, 2, Rf_ScalarLogical(s->kinds[i] == ZLM_KIND_STATE));
+    SEXP nms = PROTECT(Rf_allocVector(STRSXP, 3));
+    SET_STRING_ELT(nms, 0, Rf_mkChar("dim"));
+    SET_STRING_ELT(nms, 1, Rf_mkChar("type"));
+    SET_STRING_ELT(nms, 2, Rf_mkChar("state"));
+    Rf_setAttrib(out, R_NamesSymbol, nms);
+    UNPROTECT(2);
+    return out;
+  }
+  return R_NilValue;
+}
+
 /* list(names, dims, types, bytes) in insertion order. */
 SEXP zlm_store_info(SEXP ptr) {
   zlm_store *s = zlm_store_from(ptr);
-  SEXP out = PROTECT(Rf_allocVector(VECSXP, 4));
+  SEXP out = PROTECT(Rf_allocVector(VECSXP, 5));
   SEXP names = PROTECT(Rf_allocVector(STRSXP, s->n));
   SEXP dims = PROTECT(Rf_allocVector(VECSXP, s->n));
   SEXP types = PROTECT(Rf_allocVector(STRSXP, s->n));
@@ -459,11 +548,15 @@ SEXP zlm_store_info(SEXP ptr) {
   SET_VECTOR_ELT(out, 1, dims);
   SET_VECTOR_ELT(out, 2, types);
   SET_VECTOR_ELT(out, 3, Rf_ScalarReal(s->bytes));
-  SEXP nm = PROTECT(Rf_allocVector(STRSXP, 4));
+  SEXP state = Rf_allocVector(LGLSXP, s->n);
+  SET_VECTOR_ELT(out, 4, state);
+  for (int i = 0; i < s->n; i++) LOGICAL(state)[i] = s->kinds[i] == ZLM_KIND_STATE;
+  SEXP nm = PROTECT(Rf_allocVector(STRSXP, 5));
   SET_STRING_ELT(nm, 0, Rf_mkChar("names"));
   SET_STRING_ELT(nm, 1, Rf_mkChar("dims"));
   SET_STRING_ELT(nm, 2, Rf_mkChar("types"));
   SET_STRING_ELT(nm, 3, Rf_mkChar("bytes"));
+  SET_STRING_ELT(nm, 4, Rf_mkChar("state"));
   Rf_setAttrib(out, R_NamesSymbol, nm);
   UNPROTECT(5);
   return out;
@@ -573,13 +666,20 @@ SEXP zlm_store_save(SEXP ptr, SEXP path, SEXP type, SEXP meta, SEXP max_bytes) {
   for (R_xlen_t i = 0; i < Rf_xlength(meta); i++) {
     set_meta(g, Rf_translateCharUTF8(STRING_ELT(keys, i)), VECTOR_ELT(meta, i));
   }
-  if (s->n > 0) {
-    gguf_set_arr_data(g, ZLM_RANKS_KEY, GGUF_TYPE_INT32, s->ranks, (size_t) s->n);
+  /* state tensors are not saved (design §6.9) */
+  int n_saved = 0;
+  int *saved_ranks = (int *) R_alloc((size_t) (s->n > 0 ? s->n : 1), sizeof(int));
+  for (int i = 0; i < s->n; i++) {
+    if (s->kinds[i] == ZLM_KIND_PARAM) saved_ranks[n_saved++] = s->ranks[i];
+  }
+  if (n_saved > 0) {
+    gguf_set_arr_data(g, ZLM_RANKS_KEY, GGUF_TYPE_INT32, saved_ranks, (size_t) n_saved);
   }
   void **converted = (void **) calloc((size_t) (s->n > 0 ? s->n : 1), sizeof(void *));
   int failed = converted == NULL;
   for (int i = 0; i < s->n && !failed; i++) {
     struct ggml_tensor *t = s->tensors[i];
+    if (s->kinds[i] != ZLM_KIND_PARAM) continue;
     gguf_add_tensor(g, t);
     if (t->type != to) {
       converted[i] = convert_data(t, to);

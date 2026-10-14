@@ -82,6 +82,7 @@ static void graph_free(zlm_graph *g) {
   }
   free(g->cctx);
   free(g->cbuf);
+  free(g->writes);
   free(g);
 }
 
@@ -442,7 +443,10 @@ static void op_body(void *data) {
   } else if (strcmp(op, "swiglu") == 0) {
     r = ggml_swiglu_split(ctx, cont(ctx, a), cont(ctx, b));
   } else if (strcmp(op, "crossprod") == 0) {
-    r = ggml_mul_mat(ctx, cont(ctx, a), cont(ctx, b));
+    /* a permute that moves a dimension of 1 first is contiguous to
+       ggml_is_contiguous() but transposed to ggml_mul_mat()'s assert */
+    struct ggml_tensor *ac = ggml_is_transposed(a) ? ggml_cont(ctx, a) : cont(ctx, a);
+    r = ggml_mul_mat(ctx, ac, cont(ctx, b));
   } else if (strcmp(op, "reshape") == 0) {
     r = ggml_reshape_4d(ctx, cont(ctx, a), j->ip[0], j->ip[1], j->ip[2], j->ip[3]);
   } else if (strcmp(op, "repeat") == 0) {
@@ -467,6 +471,8 @@ static void op_body(void *data) {
     r = ggml_pad(ctx, cont(ctx, a), j->ip[0], j->ip[1], j->ip[2], j->ip[3]);
   } else if (strcmp(op, "get_rows") == 0) {
     r = ggml_get_rows(ctx, cont(ctx, a), b);
+  } else if (strcmp(op, "set_rows") == 0) {
+    r = ggml_set_rows(ctx, a, cont(ctx, j->c), b);
   } else if (strcmp(op, "clamp") == 0) {
     r = ggml_clamp(ctx, cont(ctx, a), (float) j->p[0], (float) j->p[1]);
   } else if (strcmp(op, "tri") == 0) {
@@ -547,6 +553,27 @@ static void validate(zlm_opjob *j, SEXP call) {
     /* the kernel asserts eps >= 0 during compute, where it is fatal */
     zlm_raise("zulm_invalid_argument", R_NilValue, "rms_norm's eps must be a non-negative number.");
   }
+  if (strcmp(op, "set_rows") == 0) {
+    /* a: the state; b: row indices; c: the rows to write */
+    const struct ggml_tensor *x = j->c;
+    int is_state = 0;
+    for (int i = 0; i < j->g->store->n; i++) {
+      if (j->g->store->tensors[i] == a) is_state = j->g->store->kinds[i] == ZLM_KIND_STATE;
+    }
+    if (!is_state) {
+      zlm_raise("zulm_invalid_argument", R_NilValue, "zl_state_write() writes into a state tensor from zl_state().");
+    }
+    need_f32(op, a);
+    need_f32(op, x);
+    if (b->type != GGML_TYPE_I32) {
+      zlm_raise("zulm_type_error", R_NilValue, "zl_state_write() takes i32 rows declared with zl_int().");
+    }
+    if (x->ne[0] != a->ne[0] || x->ne[2] != a->ne[2] || x->ne[3] != a->ne[3])
+      shape_error(call, op, a, x, "x must have the state's first, third and fourth dimensions");
+    if (b->ne[1] != 1 || b->ne[2] != 1 || b->ne[3] != 1 || b->ne[0] != x->ne[1])
+      shape_error(call, op, x, b, "rows must be a vector with one index per second-dimension slice of x");
+    return;
+  }
   if (strcmp(op, "rope") == 0) {
     need_f32(op, a);
     if (b->type != GGML_TYPE_I32) {
@@ -618,10 +645,15 @@ SEXP zlm_op(SEXP gptr, SEXP op, SEXP ha, SEXP hb, SEXP num, SEXP ints, SEXP call
   if (unchecked) j.op += 10;
   j.a = tensor_from(ha, gptr);
   j.b = Rf_isNull(hb) ? NULL : tensor_from(hb, gptr);
+  if (strcmp(j.op, "set_rows") == 0) {
+    /* the rows to write come as the third operand, in `num`'s place */
+    j.c = tensor_from(num, gptr);
+    num = R_NilValue;
+  }
   for (int i = 0; i < (int) Rf_xlength(num) && i < 8; i++) j.p[i] = REAL(num)[i];
   for (int i = 0; i < (int) Rf_xlength(ints) && i < 8; i++) j.ip[i] = INTEGER(ints)[i];
   if (!unchecked) validate(&j, call);
-  if (strcmp(j.op, "get_rows") == 0) {
+  if (strcmp(j.op, "get_rows") == 0 || strcmp(j.op, "set_rows") == 0) {
     /* the index must be an input, or a reshape of one, so zl_forward()
        can check its range */
     const struct ggml_tensor *base = j.b;
@@ -647,7 +679,17 @@ SEXP zlm_op(SEXP gptr, SEXP op, SEXP ha, SEXP hb, SEXP num, SEXP ints, SEXP call
               "Building %s failed: %s", j.op, msg[0] ? msg : "unknown operation");
   }
   record_call(g, gptr, call);
-  if (strcmp(j.op, "get_rows") == 0) {
+  if (strcmp(j.op, "set_rows") == 0) {
+    if (g->n_writes == g->cap_writes) {
+      int cap = g->cap_writes ? 2 * g->cap_writes : 8;
+      struct ggml_tensor **w = (struct ggml_tensor **) realloc(g->writes, (size_t) cap * sizeof *w);
+      if (w == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+      g->writes = w;
+      g->cap_writes = cap;
+    }
+    g->writes[g->n_writes++] = j.out;
+  }
+  if (strcmp(j.op, "get_rows") == 0 || strcmp(j.op, "set_rows") == 0) {
     if (g->n_checks == g->cap_checks) {
       int cap = g->cap_checks ? 2 * g->cap_checks : 8;
       zlm_index_check *c = (zlm_index_check *) realloc(g->checks, (size_t) cap * sizeof *c);
@@ -659,6 +701,7 @@ SEXP zlm_op(SEXP gptr, SEXP op, SEXP ha, SEXP hb, SEXP num, SEXP ints, SEXP call
     while (base->view_src != NULL) base = base->view_src;
     g->checks[g->n_checks].idx = (struct ggml_tensor *) base;
     g->checks[g->n_checks].bound = j.a->ne[1];
+    g->checks[g->n_checks].unique = strcmp(j.op, "set_rows") == 0;
     g->n_checks++;
   }
   return tensor_wrap(gptr, j.out);
@@ -807,6 +850,12 @@ static void finish_body(void *data) {
   g->ctx_graph = ggml_init(pg);
   if (g->ctx_graph == NULL) GGML_ABORT("out of memory finishing a graph");
   g->gf = ggml_new_graph_custom(g->ctx_graph, size, false);
+  /* state writes first: a later read of the state goes through the
+     write's view, so it follows the write */
+  for (int i = 0; i < g->n_writes; i++) {
+    ggml_set_output(g->writes[i]);
+    ggml_build_forward_expand(g->gf, g->writes[i]);
+  }
   for (int i = 0; i < f->n; i++) {
     ggml_set_output(f->outs[i]);
     ggml_build_forward_expand(g->gf, f->outs[i]);
@@ -959,6 +1008,36 @@ SEXP zlm_graph_set_input(SEXP gptr, SEXP index, SEXP values) {
   return R_NilValue;
 }
 
+int zlm_api_input_write_f32_at(zlm_graph *g, const char *name, int64_t offset, const float *src, int64_t n) {
+  if (g == NULL || name == NULL) return 1;
+  if (g->state != ZLM_GRAPH_READY) return 4;
+  struct ggml_tensor *t = NULL;
+  for (int i = 0; i < g->n_in; i++) {
+    if (strcmp(g->in[i]->name, name) == 0) t = g->in[i];
+  }
+  if (t == NULL) return 1;
+  if (t->type != GGML_TYPE_F32) return 2;
+  if (offset < 0 || n < 0 || offset > ggml_nelements(t) - n || (n > 0 && src == NULL)) return 3;
+  if (n > 0) memcpy((float *) t->data + offset, src, (size_t) n * sizeof(float));
+  return 0;
+}
+
+/* For tests of the member above: writes doubles at a flat offset. */
+SEXP zlm_input_write_at(SEXP gptr, SEXP name, SEXP offset, SEXP values) {
+  zlm_graph *g = zlm_graph_from(gptr);
+  const char *nm = Rf_translateCharUTF8(STRING_ELT(name, 0));
+  R_xlen_t n = Rf_xlength(values);
+  if (TYPEOF(values) != REALSXP) zlm_raise("zulm_type_error", R_NilValue, "`values` must be double.");
+  float *buf = n > 0 ? (float *) R_alloc((size_t) n, sizeof(float)) : NULL;
+  for (R_xlen_t k = 0; k < n; k++) buf[k] = (float) REAL(values)[k];
+  double off = Rf_asReal(offset);
+  int rc = ISNAN(off) || off < 0 || off > 9e15 ? 3 : zlm_api_input_write_f32_at(g, nm, (int64_t) off, buf, (int64_t) n);
+  if (rc != 0) {
+    zlm_raise("zulm_invalid_argument", R_NilValue, "input_write_f32_at() returned %d for input '%s'.", rc, nm);
+  }
+  return R_NilValue;
+}
+
 /* Every index input must lie within its table before a kernel reads it. */
 void zlm_graph_check_indices(zlm_graph *g) {
   for (int c = 0; c < g->n_checks; c++) {
@@ -971,6 +1050,21 @@ void zlm_graph_check_indices(zlm_graph *g) {
                   "Index input '%s' holds %d at position %lld; indices count from 0 and must be below %lld.",
                   k->idx->name, (int) v[i], (long long) i + 1, (long long) k->bound);
       }
+    }
+    if (k->unique && n > 1) {
+      /* ggml_set_rows() is undefined when two writes share a row */
+      unsigned char *seen = (unsigned char *) calloc((size_t) k->bound, 1);
+      if (seen == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+      for (int64_t i = 0; i < n; i++) {
+        if (seen[v[i]]) {
+          int dup = (int) v[i];
+          free(seen);
+          zlm_raise("zulm_invalid_argument", R_NilValue,
+                    "Row input '%s' names row %d twice; a state write needs distinct rows.", k->idx->name, dup);
+        }
+        seen[v[i]] = 1;
+      }
+      free(seen);
     }
   }
 }
@@ -1009,7 +1103,7 @@ SEXP zlm_graph_compute(SEXP gptr, SEXP which) {
 SEXP zlm_graph_info(SEXP gptr) {
   zlm_graph *g = zlm_graph_from(gptr);
   int n = g->gf ? ggml_graph_n_nodes(g->gf) : 0;
-  SEXP out = PROTECT(Rf_allocVector(VECSXP, 4));
+  SEXP out = PROTECT(Rf_allocVector(VECSXP, 5));
   SEXP ops = PROTECT(Rf_allocVector(STRSXP, n));
   for (int i = 0; i < n; i++) {
     SET_STRING_ELT(ops, i, Rf_mkChar(ggml_op_desc(ggml_graph_node(g->gf, i))));
@@ -1018,6 +1112,7 @@ SEXP zlm_graph_info(SEXP gptr) {
   SET_VECTOR_ELT(out, 1, Rf_ScalarReal(g->bytes_inputs));
   SET_VECTOR_ELT(out, 2, Rf_ScalarReal(g->bytes_compute));
   SET_VECTOR_ELT(out, 3, Rf_ScalarInteger(g->state));
+  SET_VECTOR_ELT(out, 4, Rf_ScalarInteger(g->n_writes));
   UNPROTECT(2);
   return out;
 }
