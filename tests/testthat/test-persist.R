@@ -102,6 +102,26 @@ test_that("a file whose tensors exceed the memory cap is refused", {
   expect_error(zl_load(path), class = "zulm_memory_error")
 })
 
+test_that("a metadata type outside GGUF's range is zulm_file_error (patch P11)", {
+  p <- zl_params()
+  zl_param(p, "w", 2)
+  path <- withr::local_tempfile(fileext = ".gguf")
+  zl_save(p, path, metadata = list(zzzz = 1))
+  bytes <- readBin(path, "raw", file.size(path))
+  # key-value pair: key length (u64) and key, then the value's type (i32):
+  # put 999 where the type is
+  key <- c(as.raw(c(4, 0, 0, 0, 0, 0, 0, 0)), charToRaw("zzzz"))
+  at <- which(vapply(seq_len(length(bytes) - length(key)), function(i) {
+    identical(bytes[i:(i + length(key) - 1L)], key)
+  }, logical(1)))
+  expect_length(at, 1L)
+  type_at <- at + length(key)
+  bytes[type_at:(type_at + 3L)] <- writeBin(999L, raw(), size = 4, endian = "little")
+  bad <- withr::local_tempfile(fileext = ".gguf")
+  writeBin(bytes, bad)
+  expect_error(zl_load(bad), class = "zulm_file_error")
+})
+
 test_that("a tensor type outside ggml's range is zulm_file_error", {
   p <- zl_params()
   zl_param(p, "zzzz", c(2, 2))

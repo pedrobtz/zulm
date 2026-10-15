@@ -8,6 +8,7 @@ patch: p07-opt-global-norm-clipping.patch
 patch: p08-c23-static-assert.patch
 patch: p09-gguf-type-range.patch
 patch: p10-function-pointer-types.patch
+patch: p11-gguf-key-type-range.patch
 stripped: src/ggml-cpu/amx/mmq.cpp:2:#pragma GCC diagnostic ignored "-Wpedantic"
 stripped: src/ggml-cpu/amx/mmq.cpp:3:#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 stripped: src/ggml-cpu/arch/arm/repack.cpp:22:#pragma GCC diagnostic ignored "-Woverlength-strings"
@@ -72,11 +73,11 @@ e63b382766f1b8c5ded1577be9704e85cb4e9cd24584f3e1474911a40146df33  src/ggml-cpu/u
 885a50e405f20f75ea70cb7fb062934812beffc9229ddb56a003aa150163d2fa  src/ggml-cpu/vec.h
 4490179fd8c6df80fe29fc602ed7236eb828c51e9c379efb0dd510cb5cb81fec  src/ggml-feats.h
 c11596c58c05260b14c748a32b17ef71ef556ec29590cfd89c5e52316cb9302f  src/ggml-impl.h
-51f09595accc071d004509a335e9f0329e88b40188d60a643bc8c7c0e8102d12  src/ggml-opt.cpp
+eff4de570ef4678f949c33a5d468a060e4a9016b853ac9a7bc22321212b168e6  src/ggml-opt.cpp
 5574a2dccf7c07e75b143733e04a5412d3d8c819e7945f5217a7b83a2b2ff8ab  src/ggml-quants.c
 28ae5fca1f3be636b36cd6c4fa2ca74fd42d229bfbd5352eaf66f3727bb8a6da  src/ggml-quants.h
 13a18d885393722b7c9f42d4cf8575a4d41699926d656f78a867fa4fac9dad20  src/ggml-threading.cpp
 9652729043ed91482392c1aa08af5d813190d0ace2e7982d2539d28240ab8d8b  src/ggml-threading.h
-42aeef24eef60e34de738c242ba8a8e71bc388e53343a204a72f31c10559bc6d  src/ggml-version.h
+3dca9e61965392eaaf371058da1954302a8077daa08dae8cf337b3bf86ae6c93  src/ggml-version.h
 f08cda69f6d9271ddcffe39cdf7e28d60c56201732baa8b4d99feaec3909e860  src/ggml.c
-59619f942e04316a703f0431b5cc4ce68ae337eb39786ed79f762a9a4cd69cb3  src/gguf.cpp
+09c2a439eb3c5817297ad2011a6611830ba88ae69849c4f5ad1173a8af8a1ba0  src/gguf.cpp

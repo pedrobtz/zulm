@@ -179,7 +179,8 @@ test_that("patches P1, P2 and P7 are vendored, and their cases train", {
   expect_true(all(c(
     "p01-mean-backward-accumulates.patch", "p02-sub-div-broadcast-backward.patch",
     "p07-opt-global-norm-clipping.patch", "p08-c23-static-assert.patch",
-    "p09-gguf-type-range.patch", "p10-function-pointer-types.patch"
+    "p09-gguf-type-range.patch", "p10-function-pointer-types.patch",
+    "p11-gguf-key-type-range.patch"
   ) %in% zulm_info()$ggml_patches))
   withr::local_seed(55)
   # P1: ggml_mean() whose input has a second consumer (a LayerNorm written

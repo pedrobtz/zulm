@@ -13,5 +13,6 @@ list them. Each file's header names its upstream pull request (design
 | `p08-c23-static-assert.patch` | P8 | no `static_assert` macro under C23 | not opened yet |
 | `p09-gguf-type-range.patch` | P9 | a GGUF tensor type is checked before it becomes a `ggml_type` | not opened yet |
 | `p10-function-pointer-types.patch` | P10 | type-table functions called through their own types | not opened yet |
+| `p11-gguf-key-type-range.patch` | P11 | a GGUF key's type is checked before it becomes a `gguf_type` | not opened yet |
 
 Each applies to a clean tree with `patch -p1 -d src/ggml`.

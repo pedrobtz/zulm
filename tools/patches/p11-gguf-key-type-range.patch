@@ -1,0 +1,40 @@
+From: Pedro Baltazar <pedrobtz@gmail.com>
+Subject: [PATCH P11] gguf : validate a key's type before it is a gguf_type
+
+Upstream pull request: (not opened yet; see design §9.3)
+
+gguf_init_from_reader() read a key-value pair's type, and an array's
+element type, straight into an enum gguf_type and compared it with
+GGUF_TYPE_ARRAY before the switch rejected unknown types. A malformed
+file whose type is outside the enumeration loads an invalid enum value
+first, which is undefined in C++ (UBSan: "load of value ..., which is
+not a valid value for type 'gguf_type'"); so does a failed read, which
+leaves the variable at its initial gguf_type(-1). Found by zulm's fuzz
+target for files. The reader now refuses such a type, so the read fails
+as for a truncated file, and the variable starts at GGUF_TYPE_COUNT.
+
+--- a/src/gguf.cpp
++++ b/src/gguf.cpp
+@@ -336,6 +336,11 @@
+         if (!read(tmp)) {
+             return false;
+         }
++        // a value outside the enumeration must not be loaded into a gguf_type
++        if (tmp < 0 || tmp >= GGUF_TYPE_COUNT) {
++            GGML_LOG_ERROR("%s: invalid gguf type %d\n", __func__, (int) tmp);
++            return false;
++        }
+         dst = gguf_type(tmp);
+         return true;
+     }
+@@ -555,7 +560,9 @@
+ 
+         for (int64_t i = 0; ok && i < n_kv; ++i) {
+             std::string key;
+-            gguf_type   type     = gguf_type(-1);
++            // a valid enumerator: -1 is outside the enumeration, and the
++            // comparison below reads it when the read fails
++            gguf_type   type     = GGUF_TYPE_COUNT;
+             bool        is_array = false;
+             uint64_t    n        = 1;
+ 
