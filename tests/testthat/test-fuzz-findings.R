@@ -58,6 +58,15 @@ test_that("gradients ggml cannot carry back through a permutation are refused", 
     train_once(function(w) zl_permute(w + w, c(2, 1, 3, 4))),
     class = "zulm_unsupported_backward"
   )
+  # a node handed two transposed gradients by views that are canonical
+  # again (t(t(w))), which the forward layout does not show
+  expect_error(
+    train_once(function(w) {
+      h <- zl_t(w)
+      zl_t(h) - zl_t(h)
+    }, dim = c(8, 4)),
+    class = "zulm_unsupported_backward"
+  )
   # a node handed two gradients, one with rows not dense
   expect_error(
     train_once(function(w) {

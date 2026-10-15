@@ -311,11 +311,27 @@ int zlm_backward_check(SEXP gptr, struct ggml_tensor *loss, int set_params) {
     struct ggml_tensor *nd = nodes[k];
     int nc = 0, rb = 0;
     if (nd->op == GGML_OP_PERMUTE || nd->op == GGML_OP_TRANSPOSE) {
-      nc = !canonical(nd) || nonc[k];
-      /* the source's first axis stays first only in a permutation whose
-         first axis is 0 */
-      int keeps = nd->op == GGML_OP_PERMUTE && ((const int32_t *) nd->op_params)[0] == 0;
-      rb = !keeps || rows[k];
+      if (nonc[k]) {
+        nc = 1;
+        rb = 1;
+      } else {
+        /* the backward permutes this node's gradient, canonical over its
+           shape, back to the source's axes: source axis i is this node's
+           axis ax[i], so its stride is the gradient's stride there */
+        int32_t ax[4] = { 1, 0, 2, 3 };
+        if (nd->op == GGML_OP_PERMUTE) memcpy(ax, nd->op_params, sizeof ax);
+        size_t g[GGML_MAX_DIMS], nb = ggml_type_size(nd->type);
+        for (int d = 0; d < GGML_MAX_DIMS; d++) {
+          g[d] = nb;
+          nb *= (size_t) nd->ne[d];
+        }
+        size_t want = ggml_type_size(nd->type);
+        for (int i = 0; i < GGML_MAX_DIMS; i++) {
+          if (g[ax[i]] != want) nc = 1;
+          want *= (size_t) nd->src[0]->ne[i];
+        }
+        rb = g[ax[0]] != ggml_type_size(nd->type);
+      }
     }
     for (int j = 0; j < GGML_MAX_SRC; j++) {
       struct ggml_tensor *src = nd->src[j];
