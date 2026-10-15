@@ -132,3 +132,41 @@ local_threads <- function(n, envir = parent.frame()) {
 zlm_store_bytes <- function(p) {
   getFromNamespace("zlm_call", "zulm")("zlm_store_info", p$ptr)$bytes
 }
+
+# The C table's fixture consumer (tests/testthat/zulmclient), built once per
+# session against the installed zulm.h and loaded; its namespace.
+.zulm_client <- new.env(parent = emptyenv())
+zulm_client <- function() {
+  if (is.null(.zulm_client$lib)) {
+    inc <- system.file("include", package = "zulm")
+    if (!nzchar(inc) || !file.exists(file.path(inc, "zulm.h"))) {
+      stop("zulm.h not found under system.file(\"include\", package = \"zulm\")")
+    }
+    src <- file.path(tempfile("zulmclient-src"), "zulmclient")
+    dir.create(src, recursive = TRUE)
+    file.copy(list.files(test_path("zulmclient"), full.names = TRUE), src, recursive = TRUE)
+    writeLines(
+      c(
+        sprintf('PKG_CPPFLAGS = -I"%s"', normalizePath(inc, "/")),
+        "PKG_CFLAGS = $(SHLIB_OPENMP_CFLAGS)",
+        "PKG_LIBS = $(SHLIB_OPENMP_CFLAGS)"
+      ),
+      file.path(src, "src", "Makevars")
+    )
+    lib <- tempfile("zulmclient-lib")
+    dir.create(lib)
+    out <- suppressWarnings(system2(
+      file.path(R.home("bin"), "R"),
+      c(
+        "CMD", "INSTALL", "--no-test-load", "--no-multiarch",
+        paste0("--library=", shQuote(lib)), shQuote(src)
+      ),
+      stdout = TRUE, stderr = TRUE
+    ))
+    if (!is.null(attr(out, "status")) && attr(out, "status") != 0) {
+      stop("building the C table fixture failed:\n", paste(out, collapse = "\n"))
+    }
+    .zulm_client$lib <- lib
+  }
+  loadNamespace("zulmclient", lib.loc = .zulm_client$lib)
+}

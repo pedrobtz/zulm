@@ -1,0 +1,3 @@
+useDynLib(zulmclient, .registration = TRUE)
+export(client_info, client_require, client_sampler, client_average,
+       client_state, client_batches, client_codes, client_draw_threads)
