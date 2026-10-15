@@ -2559,6 +2559,9 @@ Stages 5 and 9" reads zulm's Stages 6 and 12.
     port's tensor runtime replaced by zulm, within zukzeit's documented
     tolerance, on CPU, on every CI leg, from a branch of zukzeit that
     its maintainer can merge after zulm's release.
+    The branch is
+    [`zulm-runtime`](https://github.com/pedrobtz/zukzeit/tree/zulm-runtime),
+    whose `parity-zulm` job installs zulm's `main`.
 11. A TimesFM-style decode of 256 values through state tensors equals
     the full-context forward pass within f32 tolerance; weights
     exported by PyTorch as safetensors load into the matching modules

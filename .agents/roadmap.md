@@ -637,6 +637,19 @@ zulm with its parity fixtures green.
 
 **Design.** §7.8, §7.9, §8; D8, D25, D33; the §15 criteria 7 and 10.
 
+**Deviations (2026-10-15).** "A consumer compiled against a shorter
+table version is refused" is read with §8's append-only rule: the
+header's `zulm_api_get()` refuses an installed table shorter than the
+header the consumer was built against, and a consumer built against an
+older, shorter header keeps working. `zulm.h` names the return codes
+(`ZULM_E*`), the element types (`ZULM_TYPE_*`) and `ZULM_END`, which
+`batch_fill` returns at the end of the stream; an Arrow error there is
+`ZULM_EFAILED` with its message. `ggml_version()` lists every vendored
+patch, as `"0.26.0+p1,p2,p7,p8,p9,p10"`. The table has no output-shape
+member: a consumer knows the shapes of the graph it built in R. The
+zukzeit branch, `zulm-runtime`, drives zulm from R, as §7.9 expects of a
+first port; it uses nothing from the table.
+
 ## Stage 13 — Fuzzing, benchmarks and documentation
 
 **Issue.** [#15](https://github.com/pedrobtz/zulm/issues/15), sub-issue of
