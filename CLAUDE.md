@@ -182,6 +182,24 @@ release. `devtools::test(shuffle = TRUE)` green. `gctorture(TRUE)` clean when C
 changed. CI green on every leg. A user-facing change also needs a test, roxygen
 documentation and a `NEWS.md` entry.
 
+## Long native checks, decided per pull request
+
+Every pull request runs the quick profile and a targeted gctorture pass
+(`ZULM_GCTORTURE=1,3`: R's collector forced only inside zulm's `.Call()`s,
+the first three calls of each routine and argument types). The long runs
+happen on `main` after each merge, and on a pull request only when its
+change calls for them:
+
+- **`gctorture-full`**: the pull request changes how the C glue handles R
+  objects (allocations, `PROTECT`, `.Call` entry points, external pointers
+  and finalizers, R callbacks from C).
+- **`full-ci`**: it changes compiled code that valgrind and the ASan
+  containers should see, or Windows-only code or `Suggests` guards.
+
+Say in the pull request which you chose and why. A finding on `main` is
+fixed in a follow-up pull request; it does not block the next stage
+unless `main` stays red.
+
 ## Releasing to CRAN
 
 - **CI is the pre-submission check.** The `pedrobtz/r-actions` R CMD check runs

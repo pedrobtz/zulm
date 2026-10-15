@@ -12,10 +12,10 @@ concurrency:
 
 # The native checks of pedrobtz/r-actions for zulm's C and C++, vendored ggml
 # included (CRAN runs its sanitizer, valgrind and LTO flavours on all of it).
-# `profile` goes to the four workflows it changes: quick skips the asan
-# containers, valgrind and cran-special, and runs gctorture at step 500
-# instead of 20. lto, rchk and analyzers take minutes either way and run on
-# every push.
+# `profile` goes to the three workflows it changes: quick skips the asan
+# containers, valgrind and cran-special. gctorture has its own switch,
+# below. lto, rchk and analyzers take minutes either way and run on every
+# push.
 jobs:
   sanitizers:
     uses: pedrobtz/r-actions/.github/workflows/sanitizers.yml@v1
@@ -37,10 +37,22 @@ jobs:
   lto:
     uses: pedrobtz/r-actions/.github/workflows/lto.yml@v1
 
+  # R's collector is forced only inside zulm's .Call()s, where a missing
+  # PROTECT can bite (ZULM_GCTORTURE, R/load.R), not over testthat and R
+  # loops. Every pull request runs the targeted pass: every allocation, the
+  # first three calls of each routine and argument types, about ten
+  # minutes. The long pass, every call at step 20, runs after a merge on
+  # main, and on a pull request labelled gctorture-full, a label given
+  # when the pull request changes how the glue handles R objects; what the
+  # long pass finds on main is fixed there. r-actions' own gctorture2() is
+  # off (step 0) so that it does not torture everything else.
   gctorture:
     uses: pedrobtz/r-actions/.github/workflows/gctorture.yml@v1
     with:
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      step: 0
+      quick-step: 0
+      env: |
+        ZULM_GCTORTURE=${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'gctorture-full') && '1,3' || '20,0' }}
 
   # zurand, which zulm links to, is not on CRAN yet; rchk's image installs
   # only from CRAN.
