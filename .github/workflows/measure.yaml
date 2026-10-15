@@ -45,6 +45,14 @@ jobs:
         with:
           use-public-rspm: true
       - uses: r-lib/actions/setup-r-dependencies@v2
+      - name: A library of its own for zulm
+        # builds of zulm stay out of the cached dependency library that
+        # other jobs restore: a -march=native build there crashed covr's
+        # merge with an illegal instruction on another runner's CPU
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/zulm-lib"
+          echo "R_LIBS=$RUNNER_TEMP/zulm-lib" >> "$GITHUB_ENV"
       - name: clang as the compiler
         if: matrix.os == 'ubuntu-latest' && matrix.compiler == 'clang'
         shell: bash
@@ -108,13 +116,23 @@ jobs:
           # the TimesFM block's torch reference, and Toto 2.0 4M through
           # zukzeit's zulm-runtime branch (which brings torch)
           extra-packages: any::torch, any::hfhub, any::jsonlite, github::pedrobtz/zukzeit@zulm-runtime
+      - name: A library of its own for zulm
+        # builds of zulm stay out of the cached dependency library that
+        # other jobs restore: a -march=native build there crashed covr's
+        # merge with an illegal instruction on another runner's CPU
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/zulm-lib"
+          echo "R_LIBS=$RUNNER_TEMP/zulm-lib" >> "$GITHUB_ENV"
       - name: CPU
         run: lscpu | head -30
       - name: LibTorch
         run: Rscript -e 'if (!torch::torch_is_installed()) torch::install_torch()'
       - name: targets (the shipped build)
         run: |
-          # this tree's zulm, over the one zukzeit's Remotes installed
+          # this tree's zulm, not the one zukzeit's Remotes installed, which
+          # leaves the cached library too
+          Rscript -e 'if (nzchar(system.file(package = "zulm"))) remove.packages("zulm", lib = dirname(system.file(package = "zulm")))'
           R CMD INSTALL --preclean . > install.log 2>&1 || { tail -50 install.log; exit 1; }
           Rscript tools/run-benchmarks shipped
       - name: targets (the native hook)

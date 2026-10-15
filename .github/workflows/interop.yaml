@@ -27,6 +27,14 @@ jobs:
         with:
           use-public-rspm: true
       - uses: r-lib/actions/setup-r-dependencies@v2
+      - name: A library of its own for zulm
+        # builds of zulm stay out of the cached dependency library that
+        # other jobs restore: a -march=native build there crashed covr's
+        # merge with an illegal instruction on another runner's CPU
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/zulm-lib"
+          echo "R_LIBS=$RUNNER_TEMP/zulm-lib" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
