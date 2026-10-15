@@ -1,0 +1,3 @@
+#!/bin/sh
+rm -f src/Makevars src/*.o src/*.so src/*.dll src/symbols.rds src/zlm_v/*.map
+find src/zlm_v -name '*.o' -exec rm -f {} +
