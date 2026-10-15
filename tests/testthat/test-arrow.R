@@ -262,3 +262,13 @@ test_that("an iterator must match the graph it fills", {
   gc <- zl_graph_cache(function(x) zl_sum(x$x), p)
   expect_error(zl_forward(gc, zl_arrow_batches(counting_stream(1, 4, integer(2)), list(x = "x"), rows = 4)), class = "zulm_invalid_argument")
 })
+
+test_that("an iterator keeps its producer's objects alive", {
+  # the counting stream's counts live with its external pointer, which only
+  # the iterator references once the stream is taken over
+  it <- zl_arrow_batches(counting_stream(3, 2, integer(2)), list(x = "x"), rows = 2)
+  invisible(gc())
+  invisible(gc())
+  expect_identical(as.vector(zl_next(it)$x), c(0, 1))
+  expect_length(drain(it), 2L)
+})

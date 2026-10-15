@@ -206,7 +206,10 @@ SEXP zlm_arrow_open(SEXP xstream, SEXP names, SEXP is_int, SEXP cols, SEXP rows,
   /* the iterator owns the schema from here, and the stream only once the
      map is checked: a refused map leaves the stream with its producer */
   it->done = 1;
-  SEXP ptr = PROTECT(R_MakeExternalPtr(it, it_tag(), R_NilValue));
+  /* the producer's pointer stays reachable from the iterator: what it
+     keeps alive (R data a producer's callbacks still read) must outlive
+     the stream the iterator takes over (found by gctorture) */
+  SEXP ptr = PROTECT(R_MakeExternalPtr(it, it_tag(), xstream));
   R_RegisterCFinalizerEx(ptr, it_finalize, TRUE);
   it->rows = (int64_t) Rf_asReal(rows);
   it->na_mask = Rf_asLogical(na_mask) == TRUE;
