@@ -16,6 +16,11 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/pretrained.html">Running a pretrained block</a></li>
+    <li><a class="dropdown-item" href="../articles/training.html">Training a model</a></li>
+  </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
@@ -61,6 +66,17 @@
 <li><p><code><a href="../reference/zl_flash_attention.html">zl_flash_attention()</a></code> is ‘ggml’’s fused attention, forward only: it agrees with the plain form within f32 rounding, gives the same bits at any thread count, and attends over long contexts in memory linear in their length.</p></li>
 <li><p>Arrow streams: <code><a href="../reference/zl_arrow_batches.html">zl_arrow_batches()</a></code> reads record batches from ‘DuckDB’, Parquet or ‘arrow’ through ‘nanoarrow’ into batches of exactly <code>rows</code> rows, with missing values as errors or masks and the last batch dropped or padded; <code><a href="../reference/zl_trainer.html">zl_step()</a></code> and <code><a href="../reference/zl_graph.html">zl_forward()</a></code> take the iterator as <code>data</code>, and <code><a href="../reference/zl_arrow_batches.html">zl_next()</a></code> returns a batch as R arrays. <code><a href="../reference/zl_graph.html">zl_int()</a></code> marks integer columns in its <code>map</code>.</p></li>
 <li><p>The C table: <code>inst/include/zulm.h</code> declares <code>zulm_api</code>, registered as <code>zulm_api_v1</code>, for packages with <code>LinkingTo: zulm</code>. From C they run graphs built in R, write inputs, read outputs, read and write parameters and state tensors, draw from named streams under the session key, and fill inputs from an Arrow iterator. Failures are return codes with a message, never R errors.</p></li>
+<li><p>Two vignettes: <code><a href="../articles/training.html">vignette("training")</a></code> trains a small event-sequence model and samples from it; <code><a href="../articles/pretrained.html">vignette("pretrained")</a></code> runs an attention block exported by PyTorch from safetensors and decodes through a key-value cache in state tensors.</p></li>
+<li>
+<p>Fuzzing (<code>tools/fuzz/</code>) found, and this version fixes:</p>
+<ul><li>sizes, offsets and axes of 2^31 or more, or <code>NA</code>, reached ‘ggml’ as negative numbers; they are <code>zulm_invalid_argument</code>;</li>
+<li>an invalid choice, such as <code>zl_tri(x, "x")</code>, gave an unclassed error; it is <code>zulm_invalid_argument</code>;</li>
+<li>
+<code><a href="../reference/zl_params.html">zl_param()</a></code> allocated the initial values of a parameter larger than <code>getOption("zulm.max_bytes")</code> before refusing it;</li>
+<li>training graphs whose gradients ‘ggml’ cannot carry back through a permutation, cross-entropy labels that depend on a parameter, and a half-precision product whose second operand needs a gradient, reached ‘ggml’ assertions; they are <code>zulm_unsupported_backward</code>;</li>
+<li>gradient clipping stopped R with a ‘ggml’ assertion on a permuted parameter whose first dimension was 1 (patch P7);</li>
+<li>a GGUF file with an invalid metadata type was undefined behaviour in ‘ggml’’s reader (patch P11).</li>
+</ul></li>
 </ul></div>
   </main></div>
 

@@ -1,0 +1,157 @@
+# Running a pretrained block
+
+This vignette runs a transformer attention block whose weights were
+written by PyTorch. It loads them from a safetensors file, checks zulm’s
+output against PyTorch’s, and then decodes one position at a time
+through state tensors, as a forecasting model does.
+
+``` r
+
+library(zulm)
+```
+
+## The weights
+
+The file is a small attention block in the style of TimesFM 2.5: width
+16, two heads, rotary positions in the split-half convention, RMS
+normalisation of queries and keys, and a learned per-dimension query
+scale. Besides the weights, it holds an input and PyTorch’s output for
+it. It also holds gradients, which this vignette does not use.
+
+``` r
+
+path <- system.file("extdata", "timesfm-attention.safetensors", package = "zulm")
+st <- zl_safetensors_read(path)
+names(st)
+#>  [1] "grad.tfm.k.bias"   "grad.tfm.k.weight" "grad.tfm.k_norm"  
+#>  [4] "grad.tfm.o.bias"   "grad.tfm.o.weight" "grad.tfm.q.bias"  
+#>  [7] "grad.tfm.q.weight" "grad.tfm.q_norm"   "grad.tfm.q_scale" 
+#> [10] "grad.tfm.v.bias"   "grad.tfm.v.weight" "input.mask"       
+#> [13] "input.w"           "input.x"           "output.y"         
+#> [16] "tfm.k.bias"        "tfm.k.weight"      "tfm.k_norm"       
+#> [19] "tfm.o.bias"        "tfm.o.weight"      "tfm.q.bias"       
+#> [22] "tfm.q.weight"      "tfm.q_norm"        "tfm.q_scale"      
+#> [25] "tfm.v.bias"        "tfm.v.weight"
+meta <- attr(st, "metadata")
+dim <- as.integer(meta$dim)
+heads <- as.integer(meta$heads)
+dh <- dim %/% heads
+eps <- as.numeric(meta$eps)
+```
+
+A PyTorch linear weight has shape `[out, in]`; zulm reads the same bytes
+as `c(in, out)`, so nothing is transposed. The parameters are declared
+with the file’s names, and
+[`zl_load_safetensors()`](https://pedrobtz.github.io/zulm/reference/zl_safetensors_read.md)
+fills those it finds:
+
+``` r
+
+p <- zl_params()
+lin <- lapply(c(q = "q", k = "k", v = "v", o = "o"), function(nm) {
+  zl_linear(p, paste0("tfm.", nm), dim, dim)
+})
+zl_param(p, "tfm.q_norm", dh)
+zl_param(p, "tfm.k_norm", dh)
+zl_param(p, "tfm.q_scale", dh)
+zl_load_safetensors(p, path)
+```
+
+## The block over a whole context
+
+Queries and keys are rotated, normalised and scaled per head; the scores
+are masked additively. The input holds two series of eight positions;
+the second hides a padded prefix of three.
+
+``` r
+
+# q, k, v and the output for n positions of b series; mask c(n, n, 1, b)
+project <- function(x, pos, n, b) {
+  heads4 <- function(t) zl_reshape(t, c(dh, heads, n, b))
+  q <- zl_rope(heads4(lin$q(x)), pos, dh, base = 10000, mode = "half")
+  q <- zl_rms_norm(q, eps = eps) * zl_param_tensor(p, "tfm.q_norm")
+  q <- q * zl_scale(zl_softplus(zl_param_tensor(p, "tfm.q_scale")), 1.442695 / sqrt(dh))
+  k <- zl_rope(heads4(lin$k(x)), pos, dh, base = 10000, mode = "half")
+  k <- zl_rms_norm(k, eps = eps) * zl_param_tensor(p, "tfm.k_norm")
+  list(q = q, k = k, v = heads4(lin$v(x)))
+}
+
+x <- st[["input.x"]]
+mask <- st[["input.mask"]]
+n <- dim(x)[[2]]
+b <- dim(x)[[3]]
+full <- zl_graph(
+  function(i) {
+    h <- project(i$x, i$pos, n, b)
+    per <- function(t) zl_permute(t, c(1, 3, 2, 4))
+    s <- zl_crossprod(per(h$k), per(h$q))
+    a <- zl_softmax(s, mask = i$mask, scale = 1)
+    o <- zl_crossprod(zl_permute(per(h$v), c(2, 1, 3, 4)), a)
+    lin$o(zl_reshape(per(o), c(dim, n, b)))
+  },
+  p,
+  inputs = list(x = dim(x), pos = zl_int(n), mask = dim(mask))
+)
+y <- zl_forward(full, list(x = x, pos = seq_len(n) - 1L, mask = mask))$output
+max(abs(y - st[["output.y"]]))
+#> [1] 1.490116e-07
+```
+
+The difference from PyTorch is a few single-precision rounding steps.
+
+## Decoding through state tensors
+
+A forecasting model often produces one position at a time. Recomputing
+the whole context at every step repeats work: the keys and values of
+past positions do not change. A key-value cache keeps them. In zulm the
+cache is two state tensors: parameters that are not trained, which a
+graph writes with
+[`zl_state_write()`](https://pedrobtz.github.io/zulm/reference/zl_state.md)
+and reads like any parameter.
+
+``` r
+
+cap <- n
+zl_state(p, "cache.k", c(dh, cap, heads))
+zl_state(p, "cache.v", c(dh, cap, heads))
+
+step <- zl_graph(
+  function(i) {
+    h <- project(i$x, i$pos, 1, 1)
+    split <- function(t) zl_permute(zl_reshape(t, c(dh, heads, 1)), c(1, 3, 2))
+    k <- zl_state_write(zl_param_tensor(p, "cache.k"), split(h$k), i$row)
+    v <- zl_state_write(zl_param_tensor(p, "cache.v"), split(h$v), i$row)
+    s <- zl_crossprod(k, split(h$q))                     # c(cap, 1, heads)
+    a <- zl_softmax(s, mask = i$mask, scale = 1)
+    o <- zl_crossprod(zl_permute(v, c(2, 1, 3)), a)      # c(dh, 1, heads)
+    lin$o(zl_reshape(zl_permute(o, c(1, 3, 2)), c(dim, 1)))
+  },
+  p,
+  inputs = list(x = c(dim, 1), pos = zl_int(1), row = zl_int(1), mask = c(cap, 1, 1, 1))
+)
+```
+
+The graph is built once and runs once per position. Each run writes the
+new key and value at row `t` of the cache, and the mask lets the query
+see rows `0` to `t`:
+
+``` r
+
+decoded <- matrix(0, dim, n)
+for (t in seq_len(n) - 1L) {
+  m <- array(ifelse(seq_len(cap) - 1L <= t, 0, -Inf), c(cap, 1, 1, 1))
+  out <- zl_forward(step, list(x = matrix(x[, t + 1L, 1], dim, 1), pos = t, row = t, mask = m))
+  decoded[, t + 1L] <- out$output
+}
+max(abs(decoded - y[, , 1]))
+#> [1] 1.192093e-07
+```
+
+The decoded positions equal the first series of the whole-context pass
+within single-precision rounding.
+
+The cache keeps values as `c(dh, cap, heads)`, so the product with the
+attention weights copies the whole value cache at every step. For long
+caches, keep the values transposed instead, as a state of
+`c(1, cap * dh * heads)` written one element per row; the benchmark
+script `tools/run-benchmarks` in the source package shows the layout.

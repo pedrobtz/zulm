@@ -240,3 +240,28 @@
   parameters and state tensors, draw from named streams under the
   session key, and fill inputs from an Arrow iterator. Failures are
   return codes with a message, never R errors.
+
+- Two vignettes:
+  [`vignette("training")`](https://pedrobtz.github.io/zulm/articles/training.md)
+  trains a small event-sequence model and samples from it;
+  [`vignette("pretrained")`](https://pedrobtz.github.io/zulm/articles/pretrained.md)
+  runs an attention block exported by PyTorch from safetensors and
+  decodes through a key-value cache in state tensors.
+
+- Fuzzing (`tools/fuzz/`) found, and this version fixes:
+
+  - sizes, offsets and axes of 2^31 or more, or `NA`, reached ‘ggml’ as
+    negative numbers; they are `zulm_invalid_argument`;
+  - an invalid choice, such as `zl_tri(x, "x")`, gave an unclassed
+    error; it is `zulm_invalid_argument`;
+  - [`zl_param()`](https://pedrobtz.github.io/zulm/reference/zl_params.md)
+    allocated the initial values of a parameter larger than
+    `getOption("zulm.max_bytes")` before refusing it;
+  - training graphs whose gradients ‘ggml’ cannot carry back through a
+    permutation, cross-entropy labels that depend on a parameter, and a
+    half-precision product whose second operand needs a gradient,
+    reached ‘ggml’ assertions; they are `zulm_unsupported_backward`;
+  - gradient clipping stopped R with a ‘ggml’ assertion on a permuted
+    parameter whose first dimension was 1 (patch P7);
+  - a GGUF file with an invalid metadata type was undefined behaviour in
+    ‘ggml’’s reader (patch P11).
