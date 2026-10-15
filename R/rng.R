@@ -41,6 +41,8 @@ zl_seed <- function(seed = NULL) {
     key <- zurand::rng_key(as.integer(seed), engine = "philox4x64")
   }
   .zlm_rng$key <- key
+  # streams the C table registered were folded from the old key
+  zlm_call("zlm_rng_streams_clear")
   invisible(old)
 }
 

@@ -17,10 +17,12 @@
  */
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "ggml.h"
+#include "ggml-threading.h"
 #include "zlm_glue.h"
 #include "zlm_graph.h"
 #include "zlm_r.h"
@@ -111,6 +113,116 @@ SEXP zlm_rng_draw(SEXP stream_key, SEXP step, SEXP offset, SEXP n, SEXP dist) {
 /* Internal, for the version test: the check .onLoad applies. */
 SEXP zlm_zurand_version_ok(SEXP version) {
   return Rf_ScalarLogical(Rf_asInteger(version) >= ZURAND_API_VERSION);
+}
+
+/* ---- named streams of the C table (design §8) ------------------------- */
+
+/* The keys of the streams a consumer registered, by name. Registration is
+   on the main thread; draws read the list from any thread, so both hold
+   ggml's critical section while they touch it. */
+typedef struct {
+  char *name;
+  zurand_key key;
+} zlm_stream;
+
+static zlm_stream *zlm_streams = NULL;
+static int zlm_n_streams = 0, zlm_cap_streams = 0;
+
+static int find_stream(const char *name) {
+  for (int i = 0; i < zlm_n_streams; i++) {
+    if (strcmp(zlm_streams[i].name, name) == 0) return i;
+  }
+  return -1;
+}
+
+/* Folds the session key with `name` in R (zlm_stream_key()) and records
+   the stream's key. Main thread. 0, or a ZULM_E* code with msg set. */
+int zlm_rng_stream_register(const char *name, char *msg, size_t cap) {
+  if (name == NULL) {
+    snprintf(msg, cap, "The stream's name is NULL.");
+    return 7;
+  }
+  if (zlm_zr == NULL) {
+    snprintf(msg, cap, "zurand's C table (version %d or later) is not available.", ZURAND_API_VERSION);
+    return 5;
+  }
+  SEXP ns = PROTECT(R_FindNamespace(PROTECT(Rf_mkString("zulm"))));
+  SEXP arg = PROTECT(Rf_mkString(name));
+  SEXP call = PROTECT(Rf_lang2(Rf_install("zlm_stream_key"), arg));
+  int err = 0;
+  SEXP key = PROTECT(R_tryEvalSilent(call, ns, &err));
+  zurand_key k;
+  int bad = err || zlm_zr->key_get(key, 0, &k) != ZURAND_OK;
+  UNPROTECT(5);
+  if (bad) {
+    snprintf(msg, cap, "The key of stream '%s' could not be made.", name);
+    return 5;
+  }
+  size_t len = strlen(name) + 1;
+  int rc = 0;
+  ggml_critical_section_start();
+  int i = find_stream(name);
+  if (i >= 0) {
+    zlm_streams[i].key = k;
+  } else {
+    if (zlm_n_streams == zlm_cap_streams) {
+      int cap2 = zlm_cap_streams > 0 ? 2 * zlm_cap_streams : 16;
+      zlm_stream *s = (zlm_stream *) realloc(zlm_streams, (size_t) cap2 * sizeof *s);
+      if (s != NULL) {
+        zlm_streams = s;
+        zlm_cap_streams = cap2;
+      }
+    }
+    char *copy = zlm_n_streams < zlm_cap_streams ? (char *) malloc(len) : NULL;
+    if (copy == NULL) {
+      rc = 5;
+    } else {
+      memcpy(copy, name, len);
+      zlm_streams[zlm_n_streams].name = copy;
+      zlm_streams[zlm_n_streams].key = k;
+      zlm_n_streams++;
+    }
+  }
+  ggml_critical_section_end();
+  if (rc != 0) snprintf(msg, cap, "Out of memory registering stream '%s'.", name);
+  return rc;
+}
+
+/* Positions [offset, offset + n) of a registered stream at `step`, as f32.
+   Any thread, no R calls. 0, or a ZULM_E* code with msg set. */
+int zlm_rng_stream_draw(const char *name, uint32_t step, uint64_t offset, int dist, float *dst,
+                        int64_t n, char *msg, size_t cap) {
+  if (name == NULL || n < 0 || (n > 0 && dst == NULL)) {
+    snprintf(msg, cap, "A NULL name or buffer, or a negative count.");
+    return 7;
+  }
+  zurand_key k;
+  ggml_critical_section_start();
+  int i = find_stream(name);
+  if (i >= 0) k = zlm_streams[i].key;
+  ggml_critical_section_end();
+  if (i < 0) {
+    snprintf(msg, cap, "Stream '%s' is not registered: call rng_stream() first.", name);
+    return 1;
+  }
+  if (n == 0) return 0;
+  if (draw_f32(&k, (int64_t) step, dist, offset, (size_t) n, dst) != ZURAND_OK) {
+    snprintf(msg, cap, "zurand refused the draw from stream '%s'.", name);
+    return 5;
+  }
+  return 0;
+}
+
+/* zl_seed() changed the session key: every registered stream's key is
+   stale, so the list is emptied. */
+SEXP zlm_rng_streams_clear(void) {
+  ggml_critical_section_start();
+  for (int i = 0; i < zlm_n_streams; i++) free(zlm_streams[i].name);
+  free(zlm_streams);
+  zlm_streams = NULL;
+  zlm_n_streams = zlm_cap_streams = 0;
+  ggml_critical_section_end();
+  return R_NilValue;
 }
 
 /* ---- in-graph noise --------------------------------------------------- */

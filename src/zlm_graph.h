@@ -40,6 +40,8 @@ typedef struct zlm_graph {
   int n_in;
   struct ggml_tensor **out;
   int n_out;
+  char **out_names; /* the outputs' names, for the C table */
+  int n_out_names;
   zlm_index_check *checks;
   int n_checks, cap_checks;
   /* the R call that made each node, for errors (design §6.2): node
@@ -69,6 +71,8 @@ typedef struct zlm_graph {
 } zlm_graph;
 
 zlm_graph *zlm_graph_from(SEXP x);
+/* The graph of a pointer, or NULL; raises nothing (for the C table). */
+zlm_graph *zlm_graph_peek(SEXP x);
 
 /* The C table's offset write into an f32 input (design §8, registered in
    Stage 12): no R calls; 0 on success, nonzero for an unknown input, a
@@ -101,6 +105,7 @@ SEXP zlm_graph_compute(SEXP gptr, SEXP which);
 SEXP zlm_graph_info(SEXP gptr);
 SEXP zlm_graph_call_of(SEXP gptr, struct ggml_tensor *t);
 void zlm_graph_check_indices(zlm_graph *g);
+int zlm_graph_index_status(const zlm_graph *g, char *msg, size_t cap);
 SEXP zlm_graph_output(SEXP gptr, SEXP index);
 SEXP zlm_noise(SEXP gptr, SEXP key, SEXP dist, SEXP offset, SEXP dims, SEXP call);
 SEXP zlm_rowloss_op(SEXP gptr, SEXP ha, SEXP hb, SEXP mode, SEXP scale, SEXP call);

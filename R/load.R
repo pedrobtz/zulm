@@ -107,6 +107,8 @@ zlm_load_variant <- function(requested = NULL) {
   .zlm$supported <- supported
   .zlm$installed <- installed
   .zlm$routines <- getDLLRegisteredRoutines(dll)$.Call
+  # the C table (design §8) is the loaded variant's
+  zlm_call("zlm_api_register")
   invisible(variant)
 }
 

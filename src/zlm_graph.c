@@ -20,6 +20,7 @@
  */
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -71,6 +72,8 @@ static void graph_free(zlm_graph *g) {
   free(g->in);
   free(g->in_rank);
   free(g->out);
+  for (int i = 0; i < g->n_out_names; i++) free(g->out_names[i]);
+  free(g->out_names);
   free(g->checks);
   free(g->node_t);
   free(g->node_c);
@@ -93,6 +96,11 @@ static void graph_finalize(SEXP x) {
 
 zlm_graph *zlm_graph_from(SEXP x) {
   return (zlm_graph *) zlm_ptr(x, graph_tag(), "graph");
+}
+
+zlm_graph *zlm_graph_peek(SEXP x) {
+  if (TYPEOF(x) != EXTPTRSXP || R_ExternalPtrTag(x) != graph_tag()) return NULL;
+  return (zlm_graph *) R_ExternalPtrAddr(x);
 }
 
 SEXP zlm_graph_free_(SEXP x) {
@@ -930,6 +938,17 @@ SEXP zlm_graph_finish(SEXP gptr, SEXP outputs) {
   int n = (int) Rf_xlength(outputs);
   g->out = (struct ggml_tensor **) calloc((size_t) (n > 0 ? n : 1), sizeof *g->out);
   if (g->out == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+  SEXP onames = Rf_getAttrib(outputs, R_NamesSymbol);
+  g->out_names = (char **) calloc((size_t) (n > 0 ? n : 1), sizeof *g->out_names);
+  if (g->out_names == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+  for (int i = 0; i < n && !Rf_isNull(onames); i++) {
+    const char *nm = Rf_translateCharUTF8(STRING_ELT(onames, i));
+    size_t len = strlen(nm) + 1;
+    g->out_names[i] = (char *) malloc(len);
+    if (g->out_names[i] == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+    memcpy(g->out_names[i], nm, len);
+    g->n_out_names = i + 1;
+  }
   for (int i = 0; i < n; i++) {
     struct ggml_tensor *t = tensor_from(VECTOR_ELT(outputs, i), gptr);
     if (t->type != GGML_TYPE_F32) {
@@ -1094,35 +1113,49 @@ SEXP zlm_input_write_at(SEXP gptr, SEXP name, SEXP offset, SEXP values) {
   return R_NilValue;
 }
 
-/* Every index input must lie within its table before a kernel reads it. */
-void zlm_graph_check_indices(zlm_graph *g) {
+/* Every index input must lie within its table before a kernel reads it:
+   0 when they do; otherwise a ZULM_E* code of zulm.h, with msg set. No R
+   calls. */
+int zlm_graph_index_status(const zlm_graph *g, char *msg, size_t cap) {
   for (int c = 0; c < g->n_checks; c++) {
     const zlm_index_check *k = &g->checks[c];
     const int32_t *v = (const int32_t *) k->idx->data;
     int64_t n = ggml_nelements(k->idx);
     for (int64_t i = 0; i < n; i++) {
       if (v[i] < 0 || v[i] >= k->bound) {
-        zlm_raise("zulm_invalid_argument", R_NilValue,
-                  "Index input '%s' holds %d at position %lld; indices count from 0 and must be below %lld.",
-                  k->idx->name, (int) v[i], (long long) i + 1, (long long) k->bound);
+        snprintf(msg, cap,
+                 "Index input '%s' holds %d at position %lld; indices count from 0 and must be below %lld.",
+                 k->idx->name, (int) v[i], (long long) i + 1, (long long) k->bound);
+        return 3;
       }
     }
     if (k->unique && n > 1) {
       /* ggml_set_rows() is undefined when two writes share a row */
       unsigned char *seen = (unsigned char *) calloc((size_t) k->bound, 1);
-      if (seen == NULL) zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+      if (seen == NULL) {
+        snprintf(msg, cap, "Out of memory.");
+        return 5;
+      }
       for (int64_t i = 0; i < n; i++) {
         if (seen[v[i]]) {
-          int dup = (int) v[i];
+          snprintf(msg, cap, "Row input '%s' names row %d twice; a state write needs distinct rows.",
+                   k->idx->name, (int) v[i]);
           free(seen);
-          zlm_raise("zulm_invalid_argument", R_NilValue,
-                    "Row input '%s' names row %d twice; a state write needs distinct rows.", k->idx->name, dup);
+          return 3;
         }
         seen[v[i]] = 1;
       }
       free(seen);
     }
   }
+  return 0;
+}
+
+void zlm_graph_check_indices(zlm_graph *g) {
+  char msg[512];
+  int rc = zlm_graph_index_status(g, msg, sizeof msg);
+  if (rc == 5) zlm_raise("zulm_memory_error", R_NilValue, "%s", msg);
+  if (rc != 0) zlm_raise("zulm_invalid_argument", R_NilValue, "%s", msg);
 }
 
 /* The original node of output i, for training on it. */

@@ -25,6 +25,8 @@ typedef struct zlm_store {
 } zlm_store;
 
 zlm_store *zlm_store_from(SEXP x);
+/* The store of a pointer, or NULL; raises nothing (for the C table). */
+zlm_store *zlm_store_peek(SEXP x);
 struct ggml_tensor *zlm_store_find(const zlm_store *s, const char *name);
 enum ggml_type zlm_type_from_string(const char *type);
 const char *zlm_type_name(enum ggml_type type);

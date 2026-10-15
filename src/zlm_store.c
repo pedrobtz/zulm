@@ -40,6 +40,11 @@ zlm_store *zlm_store_from(SEXP x) {
   return (zlm_store *) zlm_ptr(x, store_tag(), "parameter store");
 }
 
+zlm_store *zlm_store_peek(SEXP x) {
+  if (TYPEOF(x) != EXTPTRSXP || R_ExternalPtrTag(x) != store_tag()) return NULL;
+  return (zlm_store *) R_ExternalPtrAddr(x);
+}
+
 static void store_free(zlm_store *s) {
   if (s == NULL) {
     return;
