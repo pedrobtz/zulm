@@ -56,7 +56,8 @@
 NULL
 
 zlm_check_width <- function(x, what) {
-  if (!is.numeric(x) || length(x) != 1L || is.na(x) || x < 1 || x != floor(x)) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) || x < 1 || x != floor(x) ||
+    x > .Machine$integer.max) {
     zlm_abort(sprintf("`%s` must be a positive whole number.", what), "zulm_invalid_argument")
   }
   as.integer(x)
@@ -108,7 +109,7 @@ zl_norm <- function(p, name, dim, type = c("layer", "rms"), affine = TRUE, eps =
   zlm_check_params(p)
   zlm_check_string(name, "name")
   dim <- zlm_check_width(dim, "dim")
-  type <- match.arg(type)
+  type <- zlm_choice(type, "type")
   zlm_check_number(eps, "eps")
   w <- paste0(name, ".weight")
   b <- paste0(name, ".bias")
@@ -168,7 +169,7 @@ zl_mlp <- function(p, name, dim, hidden = 4 * dim, act = c("swiglu", "silu")) {
   zlm_check_string(name, "name")
   dim <- zlm_check_width(dim, "dim")
   hidden <- zlm_check_width(hidden, "hidden")
-  act <- match.arg(act)
+  act <- zlm_choice(act, "act")
   up <- zl_linear(p, paste0(name, ".up"), dim, hidden)
   down <- zl_linear(p, paste0(name, ".down"), hidden, dim)
   gate <- if (act == "swiglu") zl_linear(p, paste0(name, ".gate"), dim, hidden)

@@ -87,6 +87,19 @@ zl_param <- function(p, name, dim, init = zl_init_normal(sd = 0.02), type = c("f
     zlm_abort("`init` must come from zl_init_normal() or another zl_init_*() function.", "zulm_invalid_argument")
   }
   type <- zlm_match_type(type)
+  # checked before the initial values are drawn in R
+  need <- prod(dim) * if (type == "f32") 4 else 2
+  allowed <- zlm_max_bytes()
+  if (need > allowed) {
+    zlm_abort(
+      sprintf(
+        "Parameter '%s' needs %.0f bytes, more than getOption(\"zulm.max_bytes\") allows (%.0f).",
+        name, need, allowed
+      ),
+      "zulm_memory_error",
+      requested = need, allowed = allowed
+    )
+  }
   values <- zlm_init_values(init, name, prod(dim))
   zlm_call("zlm_store_add", p$ptr, enc2utf8(name), dim, type, values, zlm_max_bytes(), 0L)
   invisible(p)
