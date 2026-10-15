@@ -15,3 +15,18 @@
    ...
    fun:pthread_create*
 }
+
+# The same for a dlopen()ed library's thread-local variables (the C
+# table's message buffer, zlm_api.c), which glibc allocates on a thread's
+# first access through __tls_get_addr(): the fixture consumer's OpenMP
+# workers are alive at exit.
+{
+   dynamic-thread-local-storage-of-live-threads
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   ...
+   fun:allocate_dtv_entry
+   ...
+   fun:__tls_get_addr
+}
