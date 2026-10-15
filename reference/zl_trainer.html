@@ -91,7 +91,7 @@ at an update.</p></dd>
 
 <dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
 <dd><p>A named list of arrays for the graph's inputs, as for
-<code><a href="zl_graph.html">zl_forward()</a></code>.</p></dd>
+<code><a href="zl_graph.html">zl_forward()</a></code>, or an iterator from <code><a href="zl_arrow_batches.html">zl_arrow_batches()</a></code>.</p></dd>
 
 
 <dt id="arg-lr">lr<a class="anchor" aria-label="anchor" href="#arg-lr"></a></dt>
@@ -104,7 +104,8 @@ at an update.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p><code>zl_trainer()</code> returns a trainer; <code>zl_step()</code> the loss, a number;
+    <p><code>zl_trainer()</code> returns a trainer; <code>zl_step()</code> the loss, a number
+(<code>NULL</code> when <code>data</code> is an iterator whose stream has ended);
 <code>zl_grad()</code> an array of the parameter's dimensions; <code>zl_reset()</code> the
 trainer, invisibly.</p>
     </div>

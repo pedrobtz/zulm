@@ -7,6 +7,9 @@
 - **The ggml authors**. Copyright holder.  
   Bundled 'ggml' library; see inst/COPYRIGHTS
 
+- **The Apache Software Foundation**. Copyright holder.  
+  Arrow C data interface definitions; see inst/COPYRIGHTS
+
 ## Citation
 
 Source:

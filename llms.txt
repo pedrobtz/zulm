@@ -122,6 +122,10 @@ pak::pak("pedrobtz/zulm")
 - [`zl_adamw()`](https://pedrobtz.github.io/zulm/reference/zl_adamw.md)
   [`zl_sgd()`](https://pedrobtz.github.io/zulm/reference/zl_adamw.md) :
   Optimisers
+- [`zl_arrow_batches()`](https://pedrobtz.github.io/zulm/reference/zl_arrow_batches.md)
+  [`zl_next()`](https://pedrobtz.github.io/zulm/reference/zl_arrow_batches.md)
+  [`print(`*`<zl_arrow_batches>`*`)`](https://pedrobtz.github.io/zulm/reference/zl_arrow_batches.md)
+  : Batches from Arrow streams
 - [`zl_cast()`](https://pedrobtz.github.io/zulm/reference/zl_cast.md) :
   Convert a tensor's type
 - [`zl_flash_attention()`](https://pedrobtz.github.io/zulm/reference/zl_flash_attention.md)

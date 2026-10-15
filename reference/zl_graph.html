@@ -92,7 +92,8 @@ returns; <code>NULL</code> for all.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Dimensions, for <code>zl_int()</code>.</p></dd>
+<dd><p>Dimensions, for <code>zl_int()</code>; or, in the <code>map</code> of
+<code><a href="zl_arrow_batches.html">zl_arrow_batches()</a></code>, the names of integer columns.</p></dd>
 
 
 <dt id="arg-g">g<a class="anchor" aria-label="anchor" href="#arg-g"></a></dt>
@@ -103,7 +104,9 @@ returns; <code>NULL</code> for all.</p></dd>
 <dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
 <dd><p>A named list of arrays, one per input, each matching its
 input's dimensions exactly (a plain vector for a one-dimensional
-input). <code>NA</code> is refused.</p></dd>
+input). <code>NA</code> is refused. Or an iterator from <code><a href="zl_arrow_batches.html">zl_arrow_batches()</a></code>,
+whose next batch is written straight into the inputs; <code>zl_forward()</code>
+then returns <code>NULL</code> once the stream has ended.</p></dd>
 
 </dl></div>
     <div class="section level2">

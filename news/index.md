@@ -219,3 +219,17 @@
   is ‘ggml’’s fused attention, forward only: it agrees with the plain
   form within f32 rounding, gives the same bits at any thread count, and
   attends over long contexts in memory linear in their length.
+
+- Arrow streams:
+  [`zl_arrow_batches()`](https://pedrobtz.github.io/zulm/reference/zl_arrow_batches.md)
+  reads record batches from ‘DuckDB’, Parquet or ‘arrow’ through
+  ‘nanoarrow’ into batches of exactly `rows` rows, with missing values
+  as errors or masks and the last batch dropped or padded;
+  [`zl_step()`](https://pedrobtz.github.io/zulm/reference/zl_trainer.md)
+  and
+  [`zl_forward()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
+  take the iterator as `data`, and
+  [`zl_next()`](https://pedrobtz.github.io/zulm/reference/zl_arrow_batches.md)
+  returns a batch as R arrays.
+  [`zl_int()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
+  marks integer columns in its `map`.

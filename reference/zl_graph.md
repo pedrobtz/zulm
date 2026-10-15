@@ -50,7 +50,9 @@ zl_graph_info(g)
 
 - ...:
 
-  Dimensions, for `zl_int()`.
+  Dimensions, for `zl_int()`; or, in the `map` of
+  [`zl_arrow_batches()`](https://pedrobtz.github.io/zulm/reference/zl_arrow_batches.md),
+  the names of integer columns.
 
 - g:
 
@@ -61,7 +63,10 @@ zl_graph_info(g)
 
   A named list of arrays, one per input, each matching its input's
   dimensions exactly (a plain vector for a one-dimensional input). `NA`
-  is refused.
+  is refused. Or an iterator from
+  [`zl_arrow_batches()`](https://pedrobtz.github.io/zulm/reference/zl_arrow_batches.md),
+  whose next batch is written straight into the inputs; `zl_forward()`
+  then returns `NULL` once the stream has ended.
 
 ## Value
 

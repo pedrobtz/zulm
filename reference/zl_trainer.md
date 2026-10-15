@@ -49,7 +49,9 @@ zl_reset(tr)
 - data:
 
   A named list of arrays for the graph's inputs, as for
-  [`zl_forward()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md).
+  [`zl_forward()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md),
+  or an iterator from
+  [`zl_arrow_batches()`](https://pedrobtz.github.io/zulm/reference/zl_arrow_batches.md).
 
 - lr:
 
@@ -61,9 +63,9 @@ zl_reset(tr)
 
 ## Value
 
-`zl_trainer()` returns a trainer; `zl_step()` the loss, a number;
-`zl_grad()` an array of the parameter's dimensions; `zl_reset()` the
-trainer, invisibly.
+`zl_trainer()` returns a trainer; `zl_step()` the loss, a number (`NULL`
+when `data` is an iterator whose stream has ended); `zl_grad()` an array
+of the parameter's dimensions; `zl_reset()` the trainer, invisibly.
 
 ## Details
 

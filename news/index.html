@@ -59,6 +59,7 @@
 <li><p><code><a href="../reference/zl_graph_cache.html">zl_graph_cache()</a></code> builds a graph per new set of input shapes for <code><a href="../reference/zl_graph.html">zl_forward()</a></code>, and frees the least recently used under <code>getOption("zulm.max_bytes")</code>.</p></li>
 <li><p><code><a href="../reference/zl-shape.html">zl_crossprod()</a></code> accepts a transposed vector as its first argument, as <code><a href="../reference/zl-modules.html">zl_attention()</a></code> makes for a single position.</p></li>
 <li><p><code><a href="../reference/zl_flash_attention.html">zl_flash_attention()</a></code> is ‘ggml’’s fused attention, forward only: it agrees with the plain form within f32 rounding, gives the same bits at any thread count, and attends over long contexts in memory linear in their length.</p></li>
+<li><p>Arrow streams: <code><a href="../reference/zl_arrow_batches.html">zl_arrow_batches()</a></code> reads record batches from ‘DuckDB’, Parquet or ‘arrow’ through ‘nanoarrow’ into batches of exactly <code>rows</code> rows, with missing values as errors or masks and the last batch dropped or padded; <code><a href="../reference/zl_trainer.html">zl_step()</a></code> and <code><a href="../reference/zl_graph.html">zl_forward()</a></code> take the iterator as <code>data</code>, and <code><a href="../reference/zl_arrow_batches.html">zl_next()</a></code> returns a batch as R arrays. <code><a href="../reference/zl_graph.html">zl_int()</a></code> marks integer columns in its <code>map</code>.</p></li>
 </ul></div>
   </main></div>
 
