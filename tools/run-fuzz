@@ -22,7 +22,7 @@ out=${FUZZ_OUT:-$(mktemp -d)}
 zurand=$(Rscript -e 'cat(system.file("include", package = "zurand"))')
 export R_HOME=$(R RHOME)
 # shellcheck disable=SC2086
-$CLANG -g -O1 -fno-omit-frame-pointer -fno-sanitize-recover=undefined -fno-sanitize=vptr \
+$CLANG -g -O1 -fno-omit-frame-pointer -fno-sanitize-recover=undefined -fsanitize-link-c++-runtime \
   -fsanitize=fuzzer,address,undefined \
   $(sh tools/fuzz/cflags "$n" "$variant" "$zurand") $(R CMD config --cppflags) \
   tools/fuzz/fuzz.c src/zlm_*.c src/zlm_*.cpp src/zlm_v/common/*.c src/zlm_v/common/*.cpp $arch \

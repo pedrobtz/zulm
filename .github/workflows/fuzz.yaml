@@ -42,11 +42,11 @@ jobs:
       # zurand.h, for the glue; zurand is not on CRAN yet
       github-packages: pedrobtz/zurand
       # tools/fuzz/cflags, with zurand's checkout; UBSan must stop the run.
-      # The job links with clang, not clang++, so UBSan's vptr check, which
-      # needs its C++ runtime, is off; every other check stays.
+      # The job links with clang, not clang++, which leaves out the C++
+      # sanitizer runtime UBSan's vptr check calls into: it is asked for.
       cflags: >-
         -g -O1 -fno-omit-frame-pointer -fno-sanitize-recover=undefined
-        -fno-sanitize=vptr
+        -fsanitize-link-c++-runtime
         -DZLM_FUZZ_TARGET=${{ matrix.target.n }} -DZLM_VARIANT=baseline
         -Isrc -Isrc/ggml/include -Isrc/ggml/src -Isrc/ggml/src/ggml-cpu
         -I.github-packages/zurand/inst/include
