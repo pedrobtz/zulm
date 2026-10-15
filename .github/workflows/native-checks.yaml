@@ -20,24 +20,21 @@ concurrency:
 # included (CRAN runs its sanitizer, valgrind and LTO flavours on all of it).
 #
 # Quick on every pull request and push, each job within about five minutes:
-# the sanitizers and gctorture run the smoke set (ZULM_TESTS=smoke, the 24
-# tests that make every kind of call into the C code, tools/smoke-tests.R),
-# the sanitizers on one build (ZULM_CFLAGS: the native hook's single
-# variant), gctorture tortures each kind of call once; valgrind, the ASan
-# containers and cran-special are skipped. Full before submission
-# (CLAUDE.md): dispatched with full: true, or a pull request labelled
-# full-ci: the whole suite, every variant, every job. lto, rchk and
-# analyzers take minutes either way and run the same.
+# gctorture runs the smoke set (ZULM_TESTS=smoke, the tests that make every
+# kind of call into the C code, tools/smoke-tests.R) and tortures each kind
+# of call once; rchk and the analyzers run as always. The sanitizers,
+# valgrind, LTO and cran-special take longer whatever the tests, and run
+# only in the full run before submission (CLAUDE.md): dispatched with
+# full: true, or a pull request labelled full-ci.
 jobs:
+  # r-actions instruments R's dependencies for six minutes before the
+  # package builds, so the sanitizers cannot be quick: full runs only.
   sanitizers:
+    if: ${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) }}
     uses: pedrobtz/r-actions/.github/workflows/sanitizers.yml@v1
     with:
       asan: true
-      profile: ${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 'full' || 'quick' }}
-      env: |
-        ZULM_TESTS=${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 'all' || 'smoke' }}
-        ZULM_CFLAGS=${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '' || '-g' }}
-        ZULM_CXXFLAGS=${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '' || '-g' }}
+      profile: full
 
   valgrind:
     uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
@@ -50,7 +47,10 @@ jobs:
       suppressions: tools/valgrind.supp
       profile: ${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 'full' || 'quick' }}
 
+  # LTO is a second build of every variant (about seven minutes): full runs
+  # only.
   lto:
+    if: ${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) }}
     uses: pedrobtz/r-actions/.github/workflows/lto.yml@v1
 
   # R's collector is forced only inside zulm's .Call()s, where a missing

@@ -187,19 +187,18 @@ documentation and a `NEWS.md` entry.
 Every pull request and every push runs the quick profile, each job within
 about five minutes:
 
-- the sanitizers and gctorture run the **smoke set**
-  (`ZULM_TESTS=smoke`): `tests/testthat/_smoke.txt`, the cheapest tests
-  that make every kind of call into the C code. Rerun
+- gctorture runs the **smoke set** (`ZULM_TESTS=smoke`):
+  `tests/testthat/_smoke.txt`, the cheapest tests that make every kind of
+  call into the C code. It tortures R's collector only inside zulm's
+  `.Call()`s (`ZULM_GCTORTURE`, `R/load.R`), each kind of call once. Rerun
   `Rscript tools/smoke-tests.R` after adding tests or C entry points, and
   commit the file.
-- gctorture tortures R's collector only inside zulm's `.Call()`s
-  (`ZULM_GCTORTURE`, `R/load.R`), each kind of call once;
-- the fuzz targets run a minute each;
-- valgrind, the ASan containers, cran-special, coverage on pull requests
-  and the `measure` benchmarks do not run.
+- the fuzz targets run a minute each; rchk and the analyzers as always;
+- the sanitizers, valgrind, LTO, cran-special, coverage on pull requests
+  and the `measure` benchmarks do not run: their setup alone takes longer.
 
-The **full run** (whole suite, every variant, valgrind, an hour of fuzzing
-per target, coverage, the §12 benchmarks) is dispatched with `full: true`
+The **full run** (every check on the whole suite and every variant, an
+hour of fuzzing per target, coverage, the §12 benchmarks) is dispatched with `full: true`
 on `native-checks`, `fuzz`, `coverage` and `measure`, or given to a pull
 request with the `full-ci` label. It is required before submission
 (Stage 14), and worth it for a pull request that changes how the C glue
