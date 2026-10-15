@@ -690,7 +690,7 @@ targets run under r-actions' libFuzzer harness with R embedded
 request, an hour nightly. They drive zulm through its R functions, so
 the header target fuzzes zulm's C readers (GGUF and the safetensors
 header length) while the safetensors header's checks, which are R and
-`zujson`, keep Stage 8's mutation test. The first runs found fourteen
+`zujson`, keep Stage 8's mutation test. The first runs found fifteen
 bugs, fixed in this stage and pinned in `test-fuzz-findings.R`; two
 were in ggml (patch P11, and P7's clipping). Three §12 targets are
 missed and recorded in the design with their measurements: the §1.1

@@ -142,7 +142,8 @@
   - `zl_param()` allocated the initial values of a parameter larger
     than `getOption("zulm.max_bytes")` before refusing it;
   - training graphs whose gradients 'ggml' cannot carry back through a
-    permutation, and cross-entropy labels that depend on a parameter,
+    permutation, cross-entropy labels that depend on a parameter, and a
+    half-precision product whose second operand needs a gradient,
     reached 'ggml' assertions; they are `zulm_unsupported_backward`;
   - gradient clipping stopped R with a 'ggml' assertion on a permuted
     parameter whose first dimension was 1 (patch P7);

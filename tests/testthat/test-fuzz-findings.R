@@ -101,3 +101,18 @@ test_that("labels that depend on a parameter are refused in training", {
   )
   expect_error(zl_trainer(g, zl_sgd()), class = "zulm_unsupported_backward")
 })
+
+test_that("a half-precision product cannot carry a gradient to its second operand", {
+  p <- zl_params()
+  zl_param(p, "w", c(4, 3), init = zl_init_ones())
+  g <- zl_graph(
+    function(x) list(loss = zl_sum(zl_crossprod(zl_cast(x$a, "f16"), zl_param_tensor(p, "w")))),
+    p,
+    inputs = list(a = c(4, 2)),
+    loss = "loss"
+  )
+  expect_error(zl_trainer(g, zl_sgd()), class = "zulm_unsupported_backward")
+  # forward, the same product runs
+  out <- zl_forward(g, list(a = matrix(1, 4, 2)))$loss
+  expect_identical(out, 24)
+})

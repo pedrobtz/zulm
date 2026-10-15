@@ -2051,7 +2051,7 @@ from `zl_step()`).
   forward and training; arbitrary bytes as GGUF and safetensors files;
   the Arrow type map on streams built from the input. A finding is a
   crash, a sanitizer report, a ggml assertion or an R error without a
-  zulm class. The first runs found fourteen; each is fixed and pinned
+  zulm class. The first runs found fifteen; each is fixed and pinned
   in `test-fuzz-findings.R` (or, for P11, `test-persist.R`). Most were
   gradients a permutation leaves outside the canonical layout, which
   ggml's backward and kernels assert against in places the pre-check

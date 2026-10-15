@@ -89,6 +89,10 @@ static int has_backward(const struct ggml_tensor *t, const int *src_needs) {
       /* a copy between types is zl_cast(), forward only */
       return t->type == t->src[0]->type;
     case GGML_OP_MUL_MAT:
+      /* b's gradient is out_prod(a, ...), which the CPU backend runs for
+         an f32 a only: an f16 or bf16 a (a cast, a half weight) leaves the
+         node to no backend, and ggml's scheduler asserts */
+      if (src_needs[1] && t->src[0]->type != GGML_TYPE_F32) return 0;
       /* a weight broadcast over b's batches reduces its gradient over the
          third dimension only: ggml asserts b's fourth is 1 */
       if (src_needs[0] && (t->src[0]->ne[2] != t->src[1]->ne[2] || t->src[0]->ne[3] != t->src[1]->ne[3])) {
