@@ -316,10 +316,16 @@ static int is_half(const struct ggml_tensor *t) {
 
 /* Contiguous operands for every kernel that is not a pure view. */
 static struct ggml_tensor *cont(struct ggml_context *ctx, struct ggml_tensor *t) {
-  /* ggml_is_contiguous() passes a tensor whose first dimension is 1 whatever
-     its stride, as a transposed column has; kernels then assert that rows
-     are dense (nb[0] is the element size), which is fatal in compute */
-  int dense = ggml_is_contiguous(t) && t->nb[0] == ggml_type_size(t->type) && !ggml_is_transposed(t);
+  /* ggml_is_contiguous() passes any stride on a dimension of 1, as a
+     transposed column or a permuted view has; kernels then assert dense
+     rows (fatal in compute) and ggml_scale() exact strides. Only the
+     canonical layout is used as it is. */
+  size_t nb = ggml_type_size(t->type);
+  int dense = 1;
+  for (int k = 0; k < GGML_MAX_DIMS && dense; k++) {
+    dense = t->nb[k] == nb;
+    nb *= (size_t) t->ne[k];
+  }
   return dense ? t : ggml_cont(ctx, t);
 }
 
