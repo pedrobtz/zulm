@@ -1,5 +1,5 @@
 # Written by tools/smoke-tests.R; do not edit. One test description
-# per line: 24 of 175 tests, 0.3 of 119.4 seconds, all 66 kinds of call.
+# per line: 24 of 185 tests, 0.3 of 8.4 seconds, all 66 kinds of call.
 an iterator is checked against its map
 array offsets are honoured
 a sampler loop in C equals zl_forward() on zl_rng_normal() draws
