@@ -1,11 +1,13 @@
 # Stage 1 measurements (design §12, §13.1): the variant scheme against
 # flag-built references, the unrolling pragma against -funroll-loops,
 # llamafile kernels (on in the shipped build) against the plain ones,
-# install time and size. Informational: the
-# numbers go to the job summary and into the design by hand.
+# install time and size. The `targets` job runs tools/run-benchmarks, the
+# §12 targets, on an AVX2 runner: the shipped build, then the native hook.
+# Informational: the numbers go to the job summary and into the design by
+# hand.
 on:
   pull_request:
-    paths: ['src/**', 'tools/bench-variants.R', '.github/workflows/measure.yaml']
+    paths: ['src/**', 'R/**', 'tools/bench-variants.R', 'tools/run-benchmarks', '.github/workflows/measure.yaml']
   workflow_dispatch:
 
 name: measure
@@ -88,3 +90,35 @@ jobs:
           done
           R CMD INSTALL --preclean . > install-plain.log 2>&1 || { tail -50 install-plain.log; exit 1; }
           Rscript tools/bench-variants.R plain
+
+  targets:
+    runs-on: ubuntu-latest
+    name: targets (ubuntu-latest, gcc)
+    env:
+      MAKEFLAGS: -j4
+      # torch's reference timings need LibTorch
+      TORCH_INSTALL: 1
+    steps:
+      - uses: actions/checkout@v6
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          # the TimesFM block's torch reference, and Toto 2.0 4M through
+          # zukzeit's zulm-runtime branch (which brings torch)
+          extra-packages: any::torch, any::hfhub, any::jsonlite, github::pedrobtz/zukzeit@zulm-runtime
+      - name: CPU
+        run: lscpu | head -30
+      - name: LibTorch
+        run: Rscript -e 'if (!torch::torch_is_installed()) torch::install_torch()'
+      - name: targets (the shipped build)
+        run: |
+          # this tree's zulm, over the one zukzeit's Remotes installed
+          R CMD INSTALL --preclean . > install.log 2>&1 || { tail -50 install.log; exit 1; }
+          Rscript tools/run-benchmarks shipped
+      - name: targets (the native hook)
+        run: |
+          export ZULM_CFLAGS="-march=native -O3" ZULM_CXXFLAGS="-march=native -O3"
+          R CMD INSTALL --preclean . > install-native.log 2>&1 || { tail -50 install-native.log; exit 1; }
+          Rscript tools/run-benchmarks native
