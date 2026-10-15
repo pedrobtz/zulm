@@ -93,6 +93,7 @@ SEXP zlm_graph_inputs(SEXP gptr);
 SEXP zlm_graph_param(SEXP gptr, SEXP name);
 SEXP zlm_tensor_info(SEXP h, SEXP gptr);
 SEXP zlm_op(SEXP gptr, SEXP op, SEXP ha, SEXP hb, SEXP num, SEXP ints, SEXP call);
+SEXP zlm_flash_attn(SEXP gptr, SEXP hq, SEXP hk, SEXP hv, SEXP hm, SEXP scale, SEXP call);
 SEXP zlm_graph_finish(SEXP gptr, SEXP outputs);
 SEXP zlm_graph_abandon(SEXP gptr);
 SEXP zlm_graph_set_input(SEXP gptr, SEXP index, SEXP values);

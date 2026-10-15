@@ -74,7 +74,9 @@ infinite with a \code{zulm_range_warning}.
 Half precision costs more than storage: 'ggml' converts the activations
 to the weight's type before a product, so \code{\link[=zl_crossprod]{zl_crossprod()}} with an f16
 weight differs from the f32 product by about 1e-3 of the output's
-scale, and with a bf16 weight by about 2e-3 to 3e-3. Results that must
+scale (2e-4 in a build for the local CPU with half-precision arithmetic,
+see the README), and with a bf16 weight by about 2e-3 to 3e-3. Results
+that must
 match a reference closely need f32 weights.
 
 An R array of \code{dim = c(d1, d2, d3, d4)} is stored with the first index

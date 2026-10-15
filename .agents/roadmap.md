@@ -29,7 +29,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | 7 | [Thread pool, interrupts, fork and determinism](#stage-7--thread-pool-interrupts-fork-and-determinism) | [#9](https://github.com/pedrobtz/zulm/issues/9) | [#28](https://github.com/pedrobtz/zulm/pull/28) | 2026-10-14 |
 | 8 | [safetensors and weight types](#stage-8--safetensors-and-weight-types) | [#10](https://github.com/pedrobtz/zulm/issues/10) | [#29](https://github.com/pedrobtz/zulm/pull/29) | 2026-10-14 |
 | 9 | [State tensors and the graph cache](#stage-9--state-tensors-and-the-graph-cache) | [#11](https://github.com/pedrobtz/zulm/issues/11) | [#30](https://github.com/pedrobtz/zulm/pull/30) | 2026-10-14 |
-| 10 | [Flash attention](#stage-10--flash-attention) | [#12](https://github.com/pedrobtz/zulm/issues/12) | | |
+| 10 | [Flash attention](#stage-10--flash-attention) | [#12](https://github.com/pedrobtz/zulm/issues/12) | [#31](https://github.com/pedrobtz/zulm/pull/31) | 2026-10-14 |
 | 11 | [Arrow batches](#stage-11--arrow-batches) | [#13](https://github.com/pedrobtz/zulm/issues/13) | | |
 | 12 | [The C table and the zukzeit proof](#stage-12--the-c-table-and-the-zukzeit-proof) | [#14](https://github.com/pedrobtz/zulm/issues/14) | | |
 | 13 | [Fuzzing, benchmarks and documentation](#stage-13--fuzzing-benchmarks-and-documentation) | [#15](https://github.com/pedrobtz/zulm/issues/15) | | |
@@ -545,6 +545,14 @@ and its thread behaviour is measured and recorded.
 - A 10 240-position forward pass runs within the memory cap.
 
 **Design.** §6.9 (flash attention); open questions 8 and 16.
+
+**Deviations (2026-10-14).** The kernel in v0.26.0 does not require the
+mask to be padded, so none is; it does split a single query's keys
+across threads, so `zl_flash_attention()` computes a single query as two
+identical ones and is thread-invariant everywhere, which answers open
+question 16 with "enabled by default". The 10 240-position test runs in
+the acceptance workflow, under a 64 MB cap, rather than in every check
+leg, since sanitizers and valgrind would take minutes over it.
 
 ## Stage 11 — Arrow batches
 

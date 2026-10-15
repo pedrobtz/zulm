@@ -128,8 +128,12 @@ static void noise_op(struct ggml_tensor *dst, int ith, int nth, void *userdata) 
 }
 
 struct ggml_tensor *zlm_noise_node(struct ggml_context *ctx, zlm_noise_t *nz, const int64_t ne[4]) {
-  return ggml_custom_4d(ctx, GGML_TYPE_F32, ne[0], ne[1], ne[2], ne[3], NULL, 0, noise_op,
-                        GGML_N_TASKS_MAX, nz);
+  /* One task, which ggml runs on thread 0, the thread that called the
+     computation: zurand's fills enter an OpenMP region even when they run
+     serially, and libgomp keeps state for each thread that does so, which
+     ggml's pool threads leaked when they exited (valgrind). The draws are
+     positional, so the values do not change. */
+  return ggml_custom_4d(ctx, GGML_TYPE_F32, ne[0], ne[1], ne[2], ne[3], NULL, 0, noise_op, 1, nz);
 }
 
 /* ---- per-row losses --------------------------------------------------- */

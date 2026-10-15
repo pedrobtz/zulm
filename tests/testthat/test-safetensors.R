@@ -143,7 +143,8 @@ test_that("half-precision weights stay in their type, and cost the documented pr
   rel <- function(a) max(abs(a - ref)) / max(abs(ref))
   # the bounds the documentation states (design §6.9): if a re-vendoring
   # changes them, the documentation must change too
-  expect_gt(rel(prod_with("f16")), 2e-4)
+  # (1.9e-4 in a native arm64 build, which has f16 vector arithmetic)
+  expect_gt(rel(prod_with("f16")), 1e-4)
   expect_lt(rel(prod_with("f16")), 5e-3)
   expect_gt(rel(prod_with("bf16")), 5e-4)
   expect_lt(rel(prod_with("bf16")), 1e-2)

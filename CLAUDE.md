@@ -24,14 +24,15 @@ exit criteria. `CLAUDE.md` orients; the design decides.
 
 ## Current state
 
-Verified 2026-10-14: Stage 9 of the roadmap. ggml v0.26.0's CPU subset is
-vendored and builds as CPU-dispatched variants (Stage 1). Stores and GGUF
-(Stage 2), graphs and operations (Stage 3), training (Stage 4), zurand
-draws with fixed-order loss sums (Stage 5), modules and PyTorch fixtures
-(Stage 6), the thread pool (Stage 7), safetensors and f16 and bf16
-weights (Stage 8), and state tensors with the graph cache (Stage 9) exist;
-flash attention comes in Stage 10. Patches P1, P2, P7, P8, P9 and P10 are
-vendored; none has an upstream pull request yet (design §9.3).
+Verified 2026-10-14: Stage 10 of the roadmap. ggml v0.26.0's CPU subset
+is vendored and builds as CPU-dispatched variants (Stage 1). Stores and
+GGUF (Stage 2), graphs and operations (Stage 3), training (Stage 4),
+zurand draws with fixed-order loss sums (Stage 5), modules and PyTorch
+fixtures (Stage 6), the thread pool (Stage 7), safetensors and f16 and
+bf16 weights (Stage 8), state tensors with the graph cache (Stage 9), and
+thread-invariant flash attention (Stage 10) exist; Arrow batches come in
+Stage 11. Patches P1, P2, P7, P8, P9 and P10 are vendored; none has an
+upstream pull request yet (design §9.3).
 
 ## Stage tracking
 

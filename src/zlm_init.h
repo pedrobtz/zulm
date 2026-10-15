@@ -58,6 +58,7 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_graph_param", (DL_FUNC) &zlm_graph_param, 2},
   {"zlm_tensor_info", (DL_FUNC) &zlm_tensor_info, 2},
   {"zlm_op", (DL_FUNC) &zlm_op, 7},
+  {"zlm_flash_attn", (DL_FUNC) &zlm_flash_attn, 7},
   {"zlm_graph_finish", (DL_FUNC) &zlm_graph_finish, 2},
   {"zlm_graph_abandon", (DL_FUNC) &zlm_graph_abandon, 1},
   {"zlm_graph_set_input", (DL_FUNC) &zlm_graph_set_input, 3},
