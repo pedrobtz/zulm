@@ -1,0 +1,17 @@
+# Valgrind suppressions for zulm's native checks (native-checks.yaml).
+#
+# Thread-local storage of threads still alive, or cached by glibc, when R
+# exits: libgomp's workers (zurand's OpenMP fills from R) and ggml's pool.
+# glibc allocates it in pthread_create() and valgrind calls it possibly
+# lost. Only that path is suppressed; definite leaks and every other kind
+# still count.
+{
+   thread-local-storage-of-live-threads
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   ...
+   fun:_dl_allocate_tls
+   ...
+   fun:pthread_create*
+}

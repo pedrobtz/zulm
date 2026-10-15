@@ -30,6 +30,8 @@ jobs:
       # since state tensors, the decode and flash-attention tests (Stages 9
       # and 10); nothing is skipped, the job only gets the time it needs.
       timeout-minutes: 300
+      # glibc's thread-local storage of live threads (tools/valgrind.supp)
+      suppressions: tools/valgrind.supp
       profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
 
   lto:

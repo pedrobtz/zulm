@@ -1169,8 +1169,10 @@ leaves the training path untouched.
   a 256-by-128 weight times 64 random columns differs from the f32
   product by 0.8e-3 to 1.3e-3 of the output's largest value with an f16
   weight, and 1.7e-3 to 2.8e-3 with bf16; a test keeps each inside the
-  documented band (2e-4 to 5e-3 for f16, 5e-4 to 1e-2 for bf16) and
-  fails if it leaves it in either direction. `zl_load(keep_types =
+  documented band (1e-4 to 5e-3 for f16, 5e-4 to 1e-2 for bf16) and
+  fails if it leaves it in either direction. The f16 floor was 2e-4 until
+  a native arm64 build (`ZULM_CFLAGS=-mcpu=native`, which enables
+  half-precision vector arithmetic) measured 1.9e-4 (Stage 10). `zl_load(keep_types =
   TRUE)` keeps a GGUF file's f16 and bf16 tensors in their type (by
   default it still widens, as §6.1 says), and `zl_param_names(p, types =
   TRUE)` returns the types; `zulm_info()` reports the build, not a
