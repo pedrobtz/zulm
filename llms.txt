@@ -124,6 +124,8 @@ pak::pak("pedrobtz/zulm")
   Optimisers
 - [`zl_cast()`](https://pedrobtz.github.io/zulm/reference/zl_cast.md) :
   Convert a tensor's type
+- [`zl_flash_attention()`](https://pedrobtz.github.io/zulm/reference/zl_flash_attention.md)
+  : Flash attention
 - [`zl_graph()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
   [`zl_int()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
   [`zl_forward()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)

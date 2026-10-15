@@ -58,6 +58,7 @@
 <li><p>State tensors: <code><a href="../reference/zl_state.html">zl_state()</a></code> declares a persistent tensor that graphs read through <code><a href="../reference/zl_params.html">zl_param_tensor()</a></code> and write with <code><a href="../reference/zl_state.html">zl_state_write()</a></code>; <code><a href="../reference/zl_state.html">zl_state_get()</a></code> and <code><a href="../reference/zl_state.html">zl_state_set()</a></code>, with <code>offset</code>, read and write it from R. States are neither trained nor saved. A key-value cache for incremental decoding is built from them.</p></li>
 <li><p><code><a href="../reference/zl_graph_cache.html">zl_graph_cache()</a></code> builds a graph per new set of input shapes for <code><a href="../reference/zl_graph.html">zl_forward()</a></code>, and frees the least recently used under <code>getOption("zulm.max_bytes")</code>.</p></li>
 <li><p><code><a href="../reference/zl-shape.html">zl_crossprod()</a></code> accepts a transposed vector as its first argument, as <code><a href="../reference/zl-modules.html">zl_attention()</a></code> makes for a single position.</p></li>
+<li><p><code><a href="../reference/zl_flash_attention.html">zl_flash_attention()</a></code> is ‘ggml’’s fused attention, forward only: it agrees with the plain form within f32 rounding, gives the same bits at any thread count, and attends over long contexts in memory linear in their length.</p></li>
 </ul></div>
   </main></div>
 

@@ -214,3 +214,8 @@
   accepts a transposed vector as its first argument, as
   [`zl_attention()`](https://pedrobtz.github.io/zulm/reference/zl-modules.md)
   makes for a single position.
+
+- [`zl_flash_attention()`](https://pedrobtz.github.io/zulm/reference/zl_flash_attention.md)
+  is ‘ggml’’s fused attention, forward only: it agrees with the plain
+  form within f32 rounding, gives the same bits at any thread count, and
+  attends over long contexts in memory linear in their length.

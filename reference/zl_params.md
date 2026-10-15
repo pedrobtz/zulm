@@ -88,8 +88,9 @@ Half precision costs more than storage: 'ggml' converts the activations
 to the weight's type before a product, so
 [`zl_crossprod()`](https://pedrobtz.github.io/zulm/reference/zl-shape.md)
 with an f16 weight differs from the f32 product by about 1e-3 of the
-output's scale, and with a bf16 weight by about 2e-3 to 3e-3. Results
-that must match a reference closely need f32 weights.
+output's scale (2e-4 in a build for the local CPU with half-precision
+arithmetic, see the README), and with a bf16 weight by about 2e-3 to
+3e-3. Results that must match a reference closely need f32 weights.
 
 An R array of `dim = c(d1, d2, d3, d4)` is stored with the first index
 fastest, as R stores it, so values move without reordering.
