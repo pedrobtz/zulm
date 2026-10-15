@@ -1,0 +1,32 @@
+#!/bin/sh
+# Build and run zulm's fuzz targets locally (design §11), as CI's fuzz
+# workflow does: libFuzzer, ASan and UBSan, R embedded.
+#
+#   tools/run-fuzz [graph|files|arrow] [seconds]
+#
+# Needs a clang with libFuzzer (on macOS, Homebrew's llvm: set CLANG) and
+# zurand installed. Run from the package root.
+set -eu
+target=${1:-graph}
+secs=${2:-60}
+case $target in
+  graph) n=1 ;; files) n=2 ;; arrow) n=3 ;;
+  *) echo "unknown target: $target" >&2; exit 1 ;;
+esac
+CLANG=${CLANG:-clang}
+case $(uname -m) in
+  x86_64 | amd64) variant=baseline; arch="src/zlm_v/baseline/ggml-*.c src/zlm_v/baseline/ggml-*.cpp" ;;
+  *) variant=neon; arch="src/zlm_v/neon/ggml-*.c src/zlm_v/neon/ggml-*.cpp" ;;
+esac
+out=${FUZZ_OUT:-$(mktemp -d)}
+zurand=$(Rscript -e 'cat(system.file("include", package = "zurand"))')
+export R_HOME=$(R RHOME)
+# shellcheck disable=SC2086
+$CLANG -g -O1 -fno-omit-frame-pointer -fno-sanitize-recover=undefined \
+  -fsanitize=fuzzer,address,undefined \
+  $(sh tools/fuzz/cflags "$n" "$variant" "$zurand") $(R CMD config --cppflags) \
+  tools/fuzz/fuzz.c src/zlm_*.c src/zlm_*.cpp src/zlm_v/common/*.c src/zlm_v/common/*.cpp $arch \
+  -o "$out/fuzz-$target" $(R CMD config --ldflags)
+mkdir -p "$out/corpus-$target"
+"$out/fuzz-$target" -max_total_time="$secs" -detect_leaks=0 -rss_limit_mb=4096 \
+  -artifact_prefix="$out/$target-" "$out/corpus-$target" tools/fuzz/seeds/$target

@@ -1,0 +1,55 @@
+# Coverage-guided fuzzing of zulm (design §11, §15 criterion 4), through
+# r-actions' libFuzzer harness with ASan and UBSan. tools/fuzz/fuzz.c embeds
+# R and drives zulm through its R functions, so every target is built with
+# the glue and the baseline variant's ggml instrumented:
+#
+#   graph  graph construction from random operation sequences and shapes,
+#          forward and training
+#   files  arbitrary bytes as a GGUF file and as a safetensors header
+#   arrow  the Arrow type map, on streams built from the input
+#
+# A finding is a crash, a sanitizer report, a ggml assertion or an R error
+# without a zulm class. tools/run-fuzz runs the same targets locally.
+on:
+  pull_request:
+  schedule:
+    # an hour a target nightly; the corpus cache joins it to the PR runs
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+name: fuzz
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [{ name: graph, n: 1 }, { name: files, n: 2 }, { name: arrow, n: 3 }]
+    name: fuzz (${{ matrix.target.name }})
+    uses: pedrobtz/r-actions/.github/workflows/fuzz.yml@v1
+    with:
+      harness: tools/fuzz/fuzz.c
+      sources: >-
+        src/zlm_*.c src/zlm_*.cpp src/zlm_v/common/*.c src/zlm_v/common/*.cpp
+        src/zlm_v/baseline/ggml-*.c src/zlm_v/baseline/ggml-*.cpp
+      embed-r: true
+      # zurand.h, for the glue; zurand is not on CRAN yet
+      github-packages: pedrobtz/zurand
+      # tools/fuzz/cflags, with zurand's checkout; UBSan must stop the run
+      cflags: >-
+        -g -O1 -fno-omit-frame-pointer -fno-sanitize-recover=undefined
+        -DZLM_FUZZ_TARGET=${{ matrix.target.n }} -DZLM_VARIANT=baseline
+        -Isrc -Isrc/ggml/include -Isrc/ggml/src -Isrc/ggml/src/ggml-cpu
+        -I.github-packages/zurand/inst/include
+        -DGGML_USE_CPU_REPACK -DGGML_USE_LLAMAFILE -DGGML_SCHED_MAX_COPIES=4
+        -DGGML_SCHED_MAX_SPLIT_INPUTS=4 -pthread
+      seed-corpus: tools/fuzz/seeds/${{ matrix.target.name }}
+      libfuzzer-args: -rss_limit_mb=4096 -max_len=4096
+      max-total-time: ${{ github.event_name == 'schedule' && 3600 || 600 }}
+      timeout-minutes: 90
