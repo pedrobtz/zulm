@@ -2051,7 +2051,7 @@ from `zl_step()`).
   forward and training; arbitrary bytes as GGUF and safetensors files;
   the Arrow type map on streams built from the input. A finding is a
   crash, a sanitizer report, a ggml assertion or an R error without a
-  zulm class. The first runs found thirteen; each is fixed and pinned
+  zulm class. The first runs found fourteen; each is fixed and pinned
   in `test-fuzz-findings.R` (or, for P11, `test-persist.R`). Most were
   gradients a permutation leaves outside the canonical layout, which
   ggml's backward and kernels assert against in places the pre-check
@@ -2139,6 +2139,47 @@ weights, on the same AVX2 machine, one thread unless stated:
 - R overhead in a decode loop under 10 % of the graph time; graph
   construction from `zl_graph_cache()` under 5 ms per new shape for a
   twenty-block model.
+
+**Measured in Stage 13 (2026-10-15)** by `tools/run-benchmarks` in the
+`measure` workflow's `targets` job: an AMD EPYC 7763 (AVX2), GCC 13.3,
+the shipped `avx2` variant, medians through R
+([run 38724905092](https://github.com/pedrobtz/zulm/actions/runs/38724905092)):
+
+| Target | Measured | Target | |
+| --- | --- | --- | --- |
+| 512³ product, 1 thread | 71.6 GFLOP/s | ≥ 25 | met |
+| §1.1 step, 1 thread | 36.7 ms | ≤ 35 | missed by 5 % |
+| §1.1 step, 2 threads | 20.3 ms, 1.81× | ≥ 1.6× | met |
+| R overhead in `zl_step()` | 0.4 % | < 5 % | met |
+| TimesFM block and head (37.71 M), 1 thread | 173 ms; `torch` 173 ms | ≤ 2× `torch` | met, 1.00× |
+| the same, 4 threads | 96 ms; `torch` 107 ms | ≤ 1.3× `torch` | met, 0.89× |
+| Toto 2.0 4M, 4 096 values, 1 thread | 22.3 ms | < 50 ms | met |
+| decode step against its projections and MLP | 1.38× | ≤ 1.2× | missed |
+| R overhead in a decode loop | 4.8 % | < 10 % | met |
+| graph construction, twenty blocks, per shape | 31 ms | < 5 ms | missed |
+
+The native hook (`-march=native -O3`, the same runner) gives a 34.95 ms
+step, which meets its target, and a slower product (62.4 GFLOP/s).
+On Apple M2 (`neon`, one thread) the product runs at 64 GFLOP/s and the
+step in 40 ms, within 2× of the AVX2 figures as asked.
+
+The three misses, with what they are:
+
+- **The §1.1 step** misses by 1.7 ms. It is a training step of a small
+  model, dominated by ggml's per-node overhead rather than by products;
+  two threads halve it.
+- **The decode step** costs 1.38× its projections and MLP. The figure
+  keeps the value cache transposed, as llama.cpp does, one element per
+  row of a `c(1, cap * 80 * 16)` state, so the product reads the cache
+  without a copy; with the cache in `c(80, cap, 16)`, the layout the
+  tests use, the copy made the step 4.6× (measured on an M2). What is
+  left is the scores, the softmax and the state writes over 640
+  positions, with the index check of every write.
+- **Graph construction** takes 31 ms per new shape for twenty blocks
+  (980 nodes): each operation is an R call into C, validated in both,
+  with its R call recorded for errors. `zl_graph_cache()` pays it once
+  per shape, so a decode or forecasting loop pays it only when a new
+  context length appears. Stage 9 had recorded the same miss.
 
 ## 13. Build, portability and CRAN
 

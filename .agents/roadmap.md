@@ -32,7 +32,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | 10 | [Flash attention](#stage-10--flash-attention) | [#12](https://github.com/pedrobtz/zulm/issues/12) | [#31](https://github.com/pedrobtz/zulm/pull/31) | 2026-10-14 |
 | 11 | [Arrow batches](#stage-11--arrow-batches) | [#13](https://github.com/pedrobtz/zulm/issues/13) | [#32](https://github.com/pedrobtz/zulm/pull/32) | 2026-10-15 |
 | 12 | [The C table and the zukzeit proof](#stage-12--the-c-table-and-the-zukzeit-proof) | [#14](https://github.com/pedrobtz/zulm/issues/14) | [#33](https://github.com/pedrobtz/zulm/pull/33) | 2026-10-15 |
-| 13 | [Fuzzing, benchmarks and documentation](#stage-13--fuzzing-benchmarks-and-documentation) | [#15](https://github.com/pedrobtz/zulm/issues/15) | | |
+| 13 | [Fuzzing, benchmarks and documentation](#stage-13--fuzzing-benchmarks-and-documentation) | [#15](https://github.com/pedrobtz/zulm/issues/15) | [#34](https://github.com/pedrobtz/zulm/pull/34) | 2026-10-15 |
 | 14 | [v0.1.0 readiness](#stage-14--v010-readiness) | [#16](https://github.com/pedrobtz/zulm/issues/16) | | |
 
 Stages 1 to 7 are the training substrate, in dependency order with the
@@ -683,6 +683,21 @@ documented for users and for the two consumers.
   CI in under ten minutes; coverage is reported.
 
 **Design.** §11, §12, §15 criteria 4 and 6.
+
+**Deviations (2026-10-15).** `zufuzz` is a skeleton, so the fuzz
+targets run under r-actions' libFuzzer harness with R embedded
+(`tools/fuzz/`, the `fuzz` workflow): ten minutes a target on a pull
+request, an hour nightly. They drive zulm through its R functions, so
+the header target fuzzes zulm's C readers (GGUF and the safetensors
+header length) while the safetensors header's checks, which are R and
+`zujson`, keep Stage 8's mutation test. The first runs found fourteen
+bugs, fixed in this stage and pinned in `test-fuzz-findings.R`; two
+were in ggml (patch P11, and P7's clipping). Three §12 targets are
+missed and recorded in the design with their measurements: the §1.1
+step (36.7 ms against 35), a decode step (1.38× against 1.2×) and
+graph construction (31 ms against 5). The second vignette runs an
+attention block from the test fixtures, shipped in `inst/extdata`, as
+the "pretrained block".
 
 ## Stage 14 — v0.1.0 readiness
 
