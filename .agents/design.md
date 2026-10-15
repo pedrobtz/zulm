@@ -2648,6 +2648,24 @@ Stages 5 and 9" reads zulm's Stages 6 and 12.
 For 0.2: with `zuexact`, reported losses are identical under
 regrouping; `zl_spectrum()` agrees with `zufft` and `stats::fft()`.
 
+**Status at Stage 14 (2026-10-15)**, each criterion with the test or CI
+job that holds it:
+
+| # | Held by | Status |
+| --- | --- | --- |
+| 1 | `R-CMD-check` (every leg, macOS x86-64 included); `build-flags` (no abort, pragma or non-portable-flag NOTE); `zl_threads()` caps at 2 under `_R_CHECK_LIMIT_CORES_` | met |
+| 2 | `test-acceptance.R` in the `acceptance` workflow: loss ratio 18 %, bit-identical at one and two threads | met |
+| 3 | `test-grad.R`, `test-fixtures.R`, `test-train.R` ("clip_norm scales every gradient …") | met |
+| 4 | `test-hostile.R`, `test-graph-hostile.R`, `test-fuzz-findings.R`; the `fuzz` workflow | met |
+| 5 | `vendor` workflow and `tools/verify-ggml` (byte for byte); `test-train.R` (patches vendored) | **open**: no patch has an upstream pull request yet (§9.3) |
+| 6 | `measure` workflow, `targets` job (§12) | **partly**: the `avx2` variant loads and the product target is met; the §1.1 step misses by 1.7 ms and two inference targets miss, recorded in §12 |
+| 7 | `test-c-table.R` (the `zulmclient` fixture package) | met |
+| 8 | `vendor` workflow and `tools/verify-ggml` (no pragma); `build-flags` (only `R_init_` exported, three platforms) | met |
+| 9 | `test-ops.R` (R oracles), `test-fixtures.R` (both §1.2 blocks from GGUF) | met |
+| 10 | zukzeit's `zulm-runtime` branch, `parity-zulm` job, against zulm's `main` | met |
+| 11 | `test-decode.R`, `test-safetensors.R`, `test-fixtures.R` (f16 band); `measure` (§12 inference targets, misses recorded) | met |
+| 12 | `tools/acceptance/arrow-duckdb.R` in the `acceptance` workflow | met |
+
 ## 16. Decisions
 
 | # | Question | Decision |
