@@ -1,0 +1,262 @@
+#!/usr/bin/env Rscript
+# Design §12's performance targets, measured through R on the installed
+# zulm. Run from the package root; the `measure` workflow runs it on an
+# AVX2 runner, with the shipped variants and with the native hook.
+#
+#   Rscript tools/run-benchmarks [label]
+#
+# Each row is the median of repeated runs. `torch` rows run when the R
+# torch package and LibTorch are installed; the Toto row when zukzeit's
+# zulm-runtime branch and hfhub are (it downloads the 16 MB checkpoint).
+args <- commandArgs(TRUE)
+label <- if (length(args) >= 1L) args[[1L]] else "default"
+suppressPackageStartupMessages(library(zulm))
+source("tests/testthat/helper-flow.R")
+
+# Median seconds per call of f(), over `batches` batches of n calls.
+per_call <- function(f, n = 10L, batches = 5L, warm = 2L) {
+  for (i in seq_len(warm)) f()
+  t <- vapply(seq_len(batches), function(b) {
+    t0 <- proc.time()[["elapsed"]]
+    for (i in seq_len(n)) f()
+    (proc.time()[["elapsed"]] - t0) / n
+  }, numeric(1))
+  stats::median(t)
+}
+
+rows <- list()
+record <- function(what, value, unit, target) {
+  rows[[length(rows) + 1L]] <<- data.frame(
+    benchmark = what, value = signif(value, 4), unit = unit, target = target
+  )
+  message(sprintf("%-46s %10.4g %-8s (%s)", what, value, unit, target))
+}
+
+zl_seed(1)
+info <- zulm_info()
+message(sprintf("zulm %s, variant %s, %s", packageVersion("zulm"), info$variant, info$compiler))
+
+# ---- training targets --------------------------------------------------
+
+p <- zl_params()
+zl_param(p, "a", c(512, 512), init = zl_init_normal(1))
+zl_param(p, "b", c(512, 512), init = zl_init_normal(1))
+g <- zl_graph(
+  function(x) zl_sum(zl_crossprod(zl_param_tensor(p, "a"), zl_param_tensor(p, "b"))) + x$x,
+  p,
+  inputs = list(x = 1)
+)
+for (th in c(1L, 2L)) {
+  zl_threads(th)
+  s <- per_call(function() zl_forward(g, list(x = 0)), n = 20L)
+  record(sprintf("512^3 product, %d thread%s", th, if (th > 1) "s" else ""), 2 * 512^3 / s / 1e9, "GFLOP/s", ">= 25 at 1 thread")
+}
+
+# The §1.1 model's training step (tests/testthat/helper-flow.R).
+fm <- flow_model()
+m <- fm$m
+build <- function(x) {
+  z <- m$ln(m$blk(m$emb(x$feat)))
+  ce <- zl_cross_entropy(m$kh(z), x$kind_prob)
+  eps <- zl_noise_normal(c(7, 64, 16), "x0")
+  x_t <- (1 - x$t) * eps + x$t * x$y
+  v <- velocity(m, z, x$kind, x_t, x$t)
+  list(loss = ce + zl_mse(v, x$y - eps))
+}
+g <- zl_graph(build, fm$p,
+  inputs = list(feat = c(8, 64, 16), kind = zl_int(64, 16), kind_prob = c(4, 64, 16), t = c(1, 64, 16), y = c(7, 64, 16)),
+  loss = "loss"
+)
+tr <- zl_trainer(g, zl_adamw(lr = 1e-3))
+data <- synth_batch(1L)
+step <- numeric(2)
+for (th in c(1L, 2L)) {
+  zl_threads(th)
+  step[[th]] <- per_call(function() zl_step(tr, data), n = 20L)
+  record(sprintf("§1.1 step, %d thread%s", th, if (th > 1) "s" else ""), 1000 * step[[th]], "ms", "<= 35 at 1 thread")
+}
+record("§1.1 step, speed-up at 2 threads", step[[1]] / step[[2]], "x", ">= 1.6")
+zl_threads(1L)
+core <- per_call(function() zulm:::zlm_call("zlm_trainer_step", tr$ptr, 1e-3), n = 20L)
+record("R overhead in zl_step()", 100 * (1 - core / step[[1]]), "%", "< 5")
+
+# ---- inference targets -------------------------------------------------
+
+# One TimesFM 2.5 block over 512 patches and the continuous head on the
+# last patch (design §1.2): 37.7 M parameters, random weights.
+P <- 512L
+tp <- zl_params()
+lin <- function(name, i, o, bias = FALSE) zl_linear(tp, name, i, o, bias = bias)
+qkv <- lin("qkv", 1280, 3 * 1280)
+out <- lin("out", 1280, 1280)
+ff0 <- lin("ff0", 1280, 1280)
+ff1 <- lin("ff1", 1280, 1280)
+h0 <- lin("head.hidden", 1280, 1280, TRUE)
+h1 <- lin("head.out", 1280, 10240, TRUE)
+hs <- lin("head.skip", 1280, 10240, TRUE)
+n1 <- zl_norm(tp, "pre.attn", 1280, type = "rms", eps = 1e-6)
+n2 <- zl_norm(tp, "pre.ff", 1280, type = "rms", eps = 1e-6)
+qn <- zl_norm(tp, "q.ln", 80, type = "rms", eps = 1e-6)
+kn <- zl_norm(tp, "k.ln", 80, type = "rms", eps = 1e-6)
+zl_param(tp, "per_dim_scale", 80)
+timesfm <- function(x) {
+  h <- qkv(n1(x$x))
+  q <- zl_reshape(zl_view(h, c(1280, P), offset = 0), c(80, 16, P))
+  k <- zl_reshape(zl_view(h, c(1280, P), offset = 1280), c(80, 16, P))
+  v <- zl_reshape(zl_view(h, c(1280, P), offset = 2 * 1280), c(80, 16, P))
+  q <- qn(zl_rope(zl_reshape(q, c(80, 16, P, 1)), x$pos, n_dims = 80, mode = "half"))
+  k <- kn(zl_rope(zl_reshape(k, c(80, 16, P, 1)), x$pos, n_dims = 80, mode = "half"))
+  q <- q * (1.442695 / sqrt(80) * zl_softplus(zl_param_tensor(tp, "per_dim_scale")))
+  q <- zl_permute(q, c(1, 3, 2, 4))
+  k <- zl_permute(k, c(1, 3, 2, 4))
+  s <- zl_softmax(zl_crossprod(k, q), mask = x$mask, scale = 1)
+  vt <- zl_permute(zl_reshape(v, c(80, 16, P, 1)), c(1, 3, 2, 4))
+  a <- zl_crossprod(zl_cont(zl_permute(vt, c(2, 1, 3, 4))), s)
+  y <- x$x + out(zl_reshape(zl_cont(zl_permute(a, c(1, 3, 2, 4))), c(1280, P)))
+  y <- y + ff1(zl_silu(ff0(n2(y))))
+  last <- zl_view(y, c(1280, 1), offset = 1280 * (P - 1))
+  h1(zl_silu(h0(last))) + hs(last)
+}
+mask <- array(0, c(P, P, 1, 1))
+mask[upper.tri(mask[, , 1, 1])] <- -Inf
+mask <- array(t(mask[, , 1, 1]), c(P, P, 1, 1))
+gt <- zl_graph(timesfm, tp, inputs = list(x = c(1280, P), pos = zl_int(P), mask = c(P, P, 1, 1)))
+xin <- list(x = matrix(stats::rnorm(1280 * P), 1280, P), pos = seq_len(P) - 1L, mask = mask)
+record("TimesFM block + head, parameters", zl_param_count(tp) / 1e6, "M", "37.7")
+for (th in c(1L, 4L)) {
+  zl_threads(th)
+  s <- per_call(function() zl_forward(gt, xin), n = 3L)
+  record(sprintf("TimesFM block + head, %d thread%s", th, if (th > 1) "s" else ""), 1000 * s, "ms",
+    if (th == 1L) "<= 2x torch" else "<= 1.3x torch")
+}
+
+if (requireNamespace("torch", quietly = TRUE) && torch::torch_is_installed()) {
+  library(torch)
+  w <- function(name) torch_tensor(t(zl_param_get(tp, name)))
+  b <- function(name) torch_tensor(zl_param_get(tp, name))
+  wv <- function(name) torch_tensor(as.vector(zl_param_get(tp, name)))
+  tw <- lapply(c(qkv = "qkv.weight", out = "out.weight", ff0 = "ff0.weight", ff1 = "ff1.weight",
+                 h0 = "head.hidden.weight", h1 = "head.out.weight", hs = "head.skip.weight"), w)
+  tb <- lapply(c(h0 = "head.hidden.bias", h1 = "head.out.bias", hs = "head.skip.bias"), b)
+  rms <- function(x, wt) x * torch_rsqrt(x$pow(2)$mean(-1, keepdim = TRUE) + 1e-6) * wt
+  half <- function(x, cos, sin) {
+    x1 <- x[, , 1:40]
+    x2 <- x[, , 41:80]
+    x * cos + torch_cat(list(-x2, x1), -1) * sin
+  }
+  freq <- 10000^(-(0:39) / 40)
+  ang <- outer(seq_len(P) - 1, freq)
+  cosv <- torch_tensor(cbind(cos(ang), cos(ang)))$unsqueeze(2)
+  sinv <- torch_tensor(cbind(sin(ang), sin(ang)))$unsqueeze(2)
+  pds <- wv("per_dim_scale")
+  xt <- torch_tensor(t(xin$x))
+  tmask <- torch_tensor(t(mask[, , 1, 1]))
+  forward <- function() {
+    with_no_grad({
+      h <- nnf_linear(rms(xt, wv("pre.attn.weight")), tw$qkv)
+      parts <- h$view(c(P, 3, 16, 80))
+      q <- half(parts[, 1, , ], cosv, sinv)
+      k <- half(parts[, 2, , ], cosv, sinv)
+      q <- rms(q, wv("q.ln.weight")) * (1.442695 / sqrt(80) * nnf_softplus(pds))
+      k <- rms(k, wv("k.ln.weight"))
+      v <- parts[, 3, , ]
+      s <- torch_matmul(q$permute(c(2, 1, 3)), k$permute(c(2, 3, 1))) + tmask
+      a <- torch_matmul(nnf_softmax(s, -1), v$permute(c(2, 1, 3)))
+      y <- xt + nnf_linear(a$permute(c(2, 1, 3))$reshape(c(P, 1280)), tw$out)
+      y <- y + nnf_linear(nnf_silu(nnf_linear(rms(y, wv("pre.ff.weight")), tw$ff0)), tw$ff1)
+      last <- y[P, ]
+      nnf_linear(nnf_silu(nnf_linear(last, tw$h0, tb$h0)), tw$h1, tb$h1) + nnf_linear(last, tw$hs, tb$hs)
+    })
+  }
+  for (th in c(1L, 4L)) {
+    torch_set_num_threads(th)
+    s <- per_call(forward, n = 3L)
+    record(sprintf("TimesFM block + head, torch, %d thread%s", th, if (th > 1) "s" else ""), 1000 * s, "ms", "reference")
+  }
+}
+
+if (requireNamespace("zukzeit", quietly = TRUE) && requireNamespace("hfhub", quietly = TRUE) &&
+  exists("toto_constructor", asNamespace("zukzeit"))) {
+  rev <- "8306a9801cf98c0f5ffe4b2dcc8f496e616d84d9"
+  paths <- vapply(c("config.json", "model.safetensors"), function(f) {
+    hfhub::hub_download("Datadog/Toto-2.0-4m", f, revision = rev)
+  }, character(1))
+  config <- jsonlite::fromJSON(paths[["config.json"]])
+  config$device <- "cpu"
+  toto <- zukzeit:::toto_constructor(config, zl_safetensors_read(paths[["model.safetensors"]]))
+  ctx <- list(cumsum(stats::rnorm(4096)))
+  zl_threads(1L)
+  s <- per_call(function() toto$predict_batch_fn(ctx, 32L, seq(0.1, 0.9, by = 0.1), device = "cpu"), n = 3L)
+  record("Toto 2.0 4M, 4 096 values, 1 thread", 1000 * s, "ms", "< 50")
+}
+
+# One decode step of a TimesFM-width block through state tensors, against
+# the same step's projections and MLP alone (design §6.9). Keys are cached
+# as c(80, cap, 16); values transposed, as llama.cpp keeps them, one
+# element per row of a c(1, cap * 80 * 16) state, so the product reads the
+# cache without a copy: element (position, d, head) is at
+# (head * 80 + d) * cap + position.
+zl_threads(1L)
+cap <- 640L
+dh <- 80L
+heads <- 16L
+dp <- zl_params()
+zl_state(dp, "kc", c(dh, cap, heads))
+zl_state(dp, "vt", c(1, cap * dh * heads))
+for (part in c("q", "k", "v", "o")) zl_param(dp, part, c(1280, 1280))
+f0 <- zl_linear(dp, "ff0", 1280, 1280)
+f1 <- zl_linear(dp, "ff1", 1280, 1280)
+proj <- function(part, x) zl_crossprod(zl_param_tensor(dp, part), x)
+split <- function(t) zl_permute(zl_reshape(t, c(dh, heads, 1)), c(1, 3, 2))
+gd <- zl_graph(function(x) {
+  q <- split(proj("q", x$x))
+  k <- zl_state_write(zl_param_tensor(dp, "kc"), split(proj("k", x$x)), x$rows)
+  vt <- zl_state_write(zl_param_tensor(dp, "vt"), zl_reshape(proj("v", x$x), c(1, dh * heads)), x$vrows)
+  a <- zl_softmax(zl_crossprod(k, q), mask = x$mask, scale = 1 / sqrt(dh))
+  o <- zl_crossprod(zl_reshape(vt, c(cap, dh, heads)), a)
+  y <- x$x + proj("o", zl_reshape(zl_permute(o, c(1, 3, 2)), c(1280, 1)))
+  y + f1(zl_silu(f0(y)))
+}, dp, inputs = list(x = c(1280, 1), rows = zl_int(1), vrows = zl_int(dh * heads), mask = c(cap, 1, 1, 1)))
+gp <- zl_graph(function(x) {
+  y <- x$x + proj("o", proj("q", x$x) + proj("k", x$x) + proj("v", x$x))
+  y + f1(zl_silu(f0(y)))
+}, dp, inputs = list(x = c(1280, 1)))
+pos <- 499L
+dmask <- array(-Inf, c(cap, 1, 1, 1))
+dmask[seq_len(pos + 1L), , , ] <- 0
+xd <- matrix(stats::rnorm(1280), 1280, 1)
+din <- list(x = xd, rows = pos, vrows = as.integer((seq_len(dh * heads) - 1L) * cap + pos), mask = dmask)
+sd_ <- per_call(function() zl_forward(gd, din), n = 50L)
+sp <- per_call(function() zl_forward(gp, list(x = xd)), n = 50L)
+record("decode step / projections and MLP alone", sd_ / sp, "x", "<= 1.2")
+which <- 0L
+core <- per_call(function() {
+  zulm:::zlm_call("zlm_graph_set_input", gd$ptr, 0L, xd)
+  zulm:::zlm_call("zlm_graph_compute", gd$ptr, which)
+}, n = 50L)
+record("R overhead in a decode loop", 100 * (1 - core / sd_), "%", "< 10")
+
+# Graph construction from zl_graph_cache() for a twenty-block model, per
+# new shape (as tests/testthat/test-decode.R).
+cp <- zl_params()
+blocks <- lapply(seq_len(20), function(i) zl_block(cp, sprintf("b%02d", i), 64L, 4L))
+gc <- zl_graph_cache(function(i) Reduce(function(h, b) b(h), blocks, i$x), cp)
+zl_forward(gc, list(x = matrix(0, 64, 1)))
+times <- vapply(2:9, function(n) system.time(zl_forward(gc, list(x = matrix(0, 64, n))))[["elapsed"]], numeric(1))
+record("graph construction, twenty blocks, per shape", 1000 * stats::median(times), "ms", "< 5")
+
+out <- do.call(rbind, rows)
+cat("\n")
+print(out, row.names = FALSE)
+f <- Sys.getenv("GITHUB_STEP_SUMMARY")
+if (nzchar(f)) {
+  md <- c(
+    sprintf("### §12 targets: %s (variant %s, %s)", label, info$variant, info$compiler),
+    "",
+    "| benchmark | value | unit | target |",
+    "| --- | --- | --- | --- |",
+    sprintf("| %s | %s | %s | %s |", out$benchmark, format(out$value), out$unit, out$target),
+    ""
+  )
+  cat(md, file = f, sep = "\n", append = TRUE)
+}

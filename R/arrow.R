@@ -61,8 +61,8 @@
 #'   zl_next(it)
 #' }
 zl_arrow_batches <- function(stream, map, rows, na = c("error", "mask"), last = c("drop", "pad")) {
-  na <- match.arg(na)
-  last <- match.arg(last)
+  na <- zlm_choice(na, "na")
+  last <- zlm_choice(last, "last")
   if (!inherits(stream, "nanoarrow_array_stream")) {
     if (!zlm_has_nanoarrow()) {
       zlm_abort(

@@ -26,10 +26,13 @@ Imports:
     zujson,
     zurand
 Suggests: 
+    knitr,
     nanoarrow,
     parallel,
+    rmarkdown,
     testthat (>= 3.0.0),
     withr
+VignetteBuilder: knitr
 LinkingTo: 
     zurand
 Remotes: 

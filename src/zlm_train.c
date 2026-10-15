@@ -81,12 +81,18 @@ static int has_backward(const struct ggml_tensor *t, const int *src_needs) {
     case GGML_OP_DIAG_MASK_INF:
     case GGML_OP_DIAG_MASK_ZERO:
     case GGML_OP_ROPE:
-    case GGML_OP_CROSS_ENTROPY_LOSS:
       return 1;
+    case GGML_OP_CROSS_ENTROPY_LOSS:
+      /* ggml has no gradient for the labels */
+      return !src_needs[1];
     case GGML_OP_CPY:
       /* a copy between types is zl_cast(), forward only */
       return t->type == t->src[0]->type;
     case GGML_OP_MUL_MAT:
+      /* b's gradient is out_prod(a, ...), which the CPU backend runs for
+         an f32 a only: an f16 or bf16 a (a cast, a half weight) leaves the
+         node to no backend, and ggml's scheduler asserts */
+      if (src_needs[1] && t->src[0]->type != GGML_TYPE_F32) return 0;
       /* a weight broadcast over b's batches reduces its gradient over the
          third dimension only: ggml asserts b's fourth is 1 */
       if (src_needs[0] && (t->src[0]->ne[2] != t->src[1]->ne[2] || t->src[0]->ne[3] != t->src[1]->ne[3])) {
@@ -127,6 +133,86 @@ static int ignores_src(const struct ggml_tensor *t, int j) {
     default:
       return 0;
   }
+}
+
+/* Whether the gradient node `t` hands its source j is the gradient `t`
+   received, or a view of it, rather than the result of a new operation:
+   a non-contiguous gradient passes on through these. */
+static int passes_grad(const struct ggml_tensor *t, int j) {
+  switch (t->op) {
+    case GGML_OP_DUP:
+    case GGML_OP_ADD1:
+    case GGML_OP_ACC:
+    case GGML_OP_SUB:
+      return j == 0;
+    case GGML_OP_ADD:
+      return j == 0 || ggml_are_same_shape(t->src[1], t);
+    default:
+      return 0;
+  }
+}
+
+/* What ggml's backward of `t` accepts of a gradient that is not in the
+   canonical layout: 2 when any (it is passed on, reshaped, or only read
+   by a product), 1 when its rows are dense (it is fed to binary and unary
+   kernels, which assert nb[0] is the element size), 0 when none (a
+   builder asserts contiguity: scale, the reshape inside cpy and cont,
+   neg, mean; or a kernel does). Read from ggml_compute_backward() and the
+   CPU kernels at v0.26.0. */
+static int takes_noncontiguous(const struct ggml_tensor *t, const int *src_needs) {
+  switch (t->op) {
+    case GGML_OP_RESHAPE:
+    case GGML_OP_PERMUTE:
+    case GGML_OP_TRANSPOSE:
+    case GGML_OP_DUP:
+    case GGML_OP_ACC:
+    case GGML_OP_SUM:
+    case GGML_OP_MUL_MAT:
+      return 2;
+    case GGML_OP_ADD:
+      /* a broadcast second source's gradient is ggml_repeat_back() of
+         this one, whose kernel asserts contiguous rows */
+      return !src_needs[1] || ggml_are_same_shape(t->src[1], t) ? 2 : 0;
+    case GGML_OP_ADD1:
+    case GGML_OP_SUB:
+      /* the second source's gradient is ggml_mean(), ggml_neg() or
+         ggml_repeat_back() of this one */
+      return !src_needs[1] ? 2 : 0;
+    case GGML_OP_MUL:
+    case GGML_OP_DIV:
+    case GGML_OP_SQR:
+    case GGML_OP_SQRT:
+    case GGML_OP_LOG:
+    case GGML_OP_SIN:
+    case GGML_OP_COS:
+    case GGML_OP_GLU:
+      return 1;
+    case GGML_OP_UNARY:
+      switch (ggml_get_unary_op(t)) {
+        case GGML_UNARY_OP_ABS:
+        case GGML_UNARY_OP_RELU:
+        case GGML_UNARY_OP_EXP:
+        case GGML_UNARY_OP_EXPM1:
+        case GGML_UNARY_OP_SOFTPLUS:
+          return 1;
+        default:
+          return 0;
+      }
+    default:
+      return 0;
+  }
+}
+
+/* Whether `t` has the canonical layout: ggml_is_contiguous() also passes
+   any stride on a dimension of 1, which ggml_scale() and others assert
+   against. */
+static int canonical(const struct ggml_tensor *t) {
+  size_t nb = ggml_type_size(t->type);
+  for (int k = 0; k < GGML_MAX_DIMS; k++) {
+    if (t->nb[k] != nb) return 0;
+    nb *= (size_t) t->ne[k];
+  }
+  return 1;
 }
 
 static int index_of(struct ggml_tensor **v, int n, const struct ggml_tensor *t) {
@@ -199,6 +285,113 @@ int zlm_backward_check(SEXP gptr, struct ggml_tensor *loss, int set_params) {
       if (si >= 0) gets[si] = 1;
     }
   }
+  /* which nodes may receive a gradient that is not in the canonical
+     layout (nonc), and one whose rows are not dense (rows): a
+     permutation's backward permutes its gradient, and the operations of
+     passes_grad() hand theirs on. A node's consumers come after it, so
+     walking back from the loss settles each node before its sources. */
+  unsigned char *nonc = (unsigned char *) calloc((size_t) (n > 0 ? n : 1), 3);
+  if (nonc == NULL) {
+    free(nodes); free(needs); free(gets); free(params);
+    ggml_free(ctx);
+    zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+  }
+  unsigned char *rows = nonc + (n > 0 ? n : 1);
+  /* how many consumers hand each node a gradient (capped at 2): ggml sums
+     a second into the first with ggml_add(), whose kernel asserts the
+     first's rows are dense */
+  unsigned char *count = rows + (n > 0 ? n : 1);
+  /* the same for parameters, which are leaves */
+  unsigned char *pinfo = (unsigned char *) calloc((size_t) (n_params > 0 ? n_params : 1), 2);
+  if (pinfo == NULL) {
+    free(nodes); free(needs); free(gets); free(params); free(nonc);
+    ggml_free(ctx);
+    zlm_raise("zulm_memory_error", R_NilValue, "Out of memory.");
+  }
+  unsigned char *pcount = pinfo, *prows = pinfo + (n_params > 0 ? n_params : 1);
+  int bad_node = -1;
+  for (int k = n - 1; k >= 0; k--) {
+    if (!gets[k] || !needs[k]) continue;
+    struct ggml_tensor *nd = nodes[k];
+    int nc = 0, rb = 0;
+    if (nd->op == GGML_OP_PERMUTE || nd->op == GGML_OP_TRANSPOSE) {
+      if (nonc[k]) {
+        nc = 1;
+        rb = 1;
+      } else {
+        /* the backward permutes this node's gradient, canonical over its
+           shape, back to the source's axes: source axis i is this node's
+           axis ax[i], so its stride is the gradient's stride there */
+        int32_t ax[4] = { 1, 0, 2, 3 };
+        if (nd->op == GGML_OP_PERMUTE) memcpy(ax, nd->op_params, sizeof ax);
+        size_t g[GGML_MAX_DIMS], nb = ggml_type_size(nd->type);
+        for (int d = 0; d < GGML_MAX_DIMS; d++) {
+          g[d] = nb;
+          nb *= (size_t) nd->ne[d];
+        }
+        size_t want = ggml_type_size(nd->type);
+        for (int i = 0; i < GGML_MAX_DIMS; i++) {
+          if (g[ax[i]] != want) nc = 1;
+          want *= (size_t) nd->src[0]->ne[i];
+        }
+        rb = g[ax[0]] != ggml_type_size(nd->type);
+      }
+    }
+    for (int j = 0; j < GGML_MAX_SRC; j++) {
+      struct ggml_tensor *src = nd->src[j];
+      if (src == NULL || ignores_src(nd, j)) continue;
+      int pi = index_of(params, n_params, src);
+      if (pi >= 0) {
+        if (pcount[pi] < 2) pcount[pi]++;
+        if ((nc && rb) || (passes_grad(nd, j) && rows[k])) prows[pi] = 1;
+        /* the second gradient of a parameter whose first may have
+           sparse rows: the consumer that hands it is refused */
+        if (pcount[pi] > 1 && prows[pi] && bad_node < 0) bad_node = k;
+        continue;
+      }
+      int si = index_of(nodes, k, src);
+      if (si < 0 || !needs[si]) continue;
+      if (count[si] < 2) count[si]++;
+      if (nc || (passes_grad(nd, j) && nonc[k])) nonc[si] = 1;
+      if ((nc && rb) || (passes_grad(nd, j) && rows[k])) rows[si] = 1;
+    }
+  }
+  for (int k = 0; k < n; k++) {
+    if (!needs[k] || !gets[k]) continue;
+    struct ggml_tensor *nd = nodes[k];
+    /* ggml's copy asserts that its own gradient, and the one its source
+       holds so far, are contiguous */
+    int si0 = nd->src[0] != NULL ? index_of(nodes, k, nd->src[0]) : -1;
+    int sn[GGML_MAX_SRC] = { 0 };
+    for (int j = 0; j < GGML_MAX_SRC; j++) {
+      struct ggml_tensor *src = nd->src[j];
+      if (src == NULL || ignores_src(nd, j)) continue;
+      int si = index_of(nodes, k, src);
+      sn[j] = index_of(params, n_params, src) >= 0 || (si >= 0 && needs[si]);
+    }
+    int takes = takes_noncontiguous(nd, sn);
+    int bad = (nonc[k] && takes == 0) || (rows[k] && (takes < 2 || count[k] > 1)) ||
+              (nd->op == GGML_OP_CONT && si0 >= 0 && nonc[si0]) || k == bad_node;
+    if (bad) {
+      const char *desc = ggml_op_desc(nd);
+      SEXP call = PROTECT(zlm_graph_call_of(gptr, nd));
+      free(nodes); free(needs); free(gets); free(params); free(nonc); free(pinfo);
+      ggml_free(ctx);
+      SEXP extra = PROTECT(Rf_allocVector(VECSXP, 2));
+      SEXP nm = PROTECT(Rf_allocVector(STRSXP, 2));
+      SET_VECTOR_ELT(extra, 0, Rf_mkString(desc));
+      SET_VECTOR_ELT(extra, 1, call);
+      SET_STRING_ELT(nm, 0, Rf_mkChar("op"));
+      SET_STRING_ELT(nm, 1, Rf_mkChar("call"));
+      Rf_setAttrib(extra, R_NamesSymbol, nm);
+      zlm_raise("zulm_unsupported_backward", extra,
+                "%s would receive the non-contiguous gradient of a permutation (zl_permute() "
+                "or zl_t()), which ggml cannot back-propagate through it.",
+                desc);
+    }
+  }
+  free(nonc);
+  free(pinfo);
   for (int k = 0; k < n; k++) {
     if (!needs[k] || !gets[k]) continue;
     struct ggml_tensor *nd = nodes[k];

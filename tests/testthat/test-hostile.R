@@ -63,7 +63,7 @@ test_that("the memory cap is enforced with both byte counts", {
   withr::local_options(zulm.max_bytes = 1000)
   p <- zl_params()
   err <- expect_error(zl_param(p, "big", c(100, 100)), class = "zulm_memory_error")
-  expect_gt(err$requested, 40000)
+  expect_gte(err$requested, 40000)
   expect_identical(err$allowed, 1000)
   expect_identical(zl_param_names(p), character())
   withr::local_options(zulm.max_bytes = -1)

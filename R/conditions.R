@@ -143,3 +143,20 @@ zlm_maybe_gc <- function() {
   }
   invisible(live)
 }
+
+# match.arg() for the caller's argument `what`, raising zulm_invalid_argument
+# instead of base R's unclassed error.
+zlm_choice <- function(x, what) {
+  choices <- eval(formals(sys.function(sys.parent()))[[what]])
+  if (identical(x, choices)) {
+    return(choices[[1L]])
+  }
+  i <- if (is.character(x) && length(x) == 1L && !is.na(x)) pmatch(x, choices) else NA
+  if (is.na(i)) {
+    zlm_abort(
+      sprintf("`%s` must be one of %s.", what, paste0("\"", choices, "\"", collapse = ", ")),
+      "zulm_invalid_argument"
+    )
+  }
+  choices[[i]]
+}

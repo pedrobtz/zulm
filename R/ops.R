@@ -42,6 +42,10 @@ zlm_as_tensor <- function(x, what = "x") {
 
 # Runs one operation in C and wraps the result with rank `rank`.
 zlm_op <- function(op, a, b = NULL, num = numeric(), ints = integer(), rank = a$rank, call = NULL) {
+  if (anyNA(ints) || any(abs(ints) > .Machine$integer.max)) {
+    # NA, and what as.integer() makes NA, reach ggml as -2^31
+    zlm_abort("Sizes, offsets and axes must be whole numbers below 2^31.", "zulm_invalid_argument")
+  }
   r <- zlm_call_quiet(
     "zlm_op", a$graph, op, a$ptr, if (is.null(b)) NULL else b$ptr,
     as.double(num), as.integer(ints), call
@@ -230,7 +234,7 @@ zl_tanh <- zlm_unary("tanh")
 #' @rdname zl-arith
 #' @export
 zl_gelu <- function(x, approximate = c("none", "tanh")) {
-  approximate <- match.arg(approximate)
+  approximate <- zlm_choice(approximate, "approximate")
   zlm_op("gelu", zlm_as_tensor(x), ints = as.integer(approximate == "tanh"), call = sys.call())
 }
 
@@ -424,7 +428,7 @@ zl_clamp <- function(x, lo, hi) {
 #' @rdname zl-select
 #' @export
 zl_tri <- function(x, type = c("lower", "upper", "lower_strict", "upper_strict")) {
-  type <- match.arg(type)
+  type <- zlm_choice(type, "type")
   x <- zlm_as_tensor(x)
   # ggml numbers the first dimension as columns: R's lower triangle (row
   # index above column index) is ggml's upper.
@@ -494,7 +498,7 @@ zl_causal_mask <- function(x) {
 #' @rdname zl-attention
 #' @export
 zl_rope <- function(x, pos, n_dims, base = 10000, mode = c("interleaved", "half")) {
-  mode <- match.arg(mode)
+  mode <- zlm_choice(mode, "mode")
   x <- zlm_as_tensor(x)
   pos <- zlm_as_tensor(pos, "pos")
   n_dims <- zlm_check_num(n_dims, "n_dims")

@@ -527,8 +527,9 @@ static void ggml_opt_build(ggml_opt_context_t opt_ctx) {
         struct ggml_tensor * grad = ggml_graph_get_grad(opt_ctx->gb_opt, node);
         if (grad && (node->flags & GGML_TENSOR_FLAG_PARAM)) {
             // a gradient can be a view (of a permuted parameter, say): the
-            // kernels below need contiguous rows
-            if (!ggml_is_contiguous(grad)) {
+            // kernels below need contiguous, dense rows (nb[0] too, which
+            // ggml_is_contiguous() skips on a first dimension of 1)
+            if (!ggml_is_contiguous(grad) || grad->nb[0] != ggml_type_size(grad->type)) {
                 grad = ggml_cont(opt_ctx->ctx_compute, grad);
             }
             struct ggml_tensor * sumsq = ggml_sum(opt_ctx->ctx_compute, ggml_sqr(opt_ctx->ctx_compute, grad));
@@ -560,7 +561,8 @@ static void ggml_opt_build(ggml_opt_context_t opt_ctx) {
             if (clip_scale) {
                 // the step kernels read the gradient with the weight's
                 // strides, so it must be contiguous: the product is
-                grad = ggml_mul(opt_ctx->ctx_compute, ggml_is_contiguous(grad) ? grad : ggml_cont(opt_ctx->ctx_compute, grad), clip_scale);
+                const bool dense = ggml_is_contiguous(grad) && grad->nb[0] == ggml_type_size(grad->type);
+                grad = ggml_mul(opt_ctx->ctx_compute, dense ? grad : ggml_cont(opt_ctx->ctx_compute, grad), clip_scale);
             }
             struct ggml_tensor * opt_step;
             switch (optimizer) {

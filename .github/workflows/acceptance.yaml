@@ -35,6 +35,14 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::testthat, any::withr, any::nanoarrow, any::DBI, any::duckdb
+      - name: A library of its own for zulm
+        # builds of zulm stay out of the cached dependency library that
+        # other jobs restore: a -march=native build there crashed covr's
+        # merge with an illegal instruction on another runner's CPU
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/zulm-lib"
+          echo "R_LIBS=$RUNNER_TEMP/zulm-lib" >> "$GITHUB_ENV"
       - run: R CMD INSTALL .
       - name: the §1.1 model, 1 000 steps at one and two threads
         shell: Rscript {0}
@@ -67,8 +75,16 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::testthat, any::withr
+      - name: A library of its own for zulm
+        # builds of zulm stay out of the cached dependency library that
+        # other jobs restore: a -march=native build there crashed covr's
+        # merge with an illegal instruction on another runner's CPU
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/zulm-lib"
+          echo "R_LIBS=$RUNNER_TEMP/zulm-lib" >> "$GITHUB_ENV"
       - run: |
-          Rscript -e 'if (requireNamespace("nanoarrow", quietly = TRUE)) remove.packages("nanoarrow")'
+          Rscript -e 'if (requireNamespace("nanoarrow", quietly = TRUE)) remove.packages("nanoarrow", lib = dirname(system.file(package = "nanoarrow")))'
           R CMD INSTALL .
       - name: the Arrow tests skip, and the documented errors hold, without nanoarrow
         shell: Rscript {0}

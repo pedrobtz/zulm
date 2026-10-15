@@ -336,6 +336,11 @@ struct gguf_reader {
         if (!read(tmp)) {
             return false;
         }
+        // a value outside the enumeration must not be loaded into a gguf_type
+        if (tmp < 0 || tmp >= GGUF_TYPE_COUNT) {
+            GGML_LOG_ERROR("%s: invalid gguf type %d\n", __func__, (int) tmp);
+            return false;
+        }
         dst = gguf_type(tmp);
         return true;
     }
@@ -555,7 +560,9 @@ static struct gguf_context * gguf_init_from_reader(const struct gguf_reader & gr
 
         for (int64_t i = 0; ok && i < n_kv; ++i) {
             std::string key;
-            gguf_type   type     = gguf_type(-1);
+            // a valid enumerator: -1 is outside the enumeration, and the
+            // comparison below reads it when the read fails
+            gguf_type   type     = GGUF_TYPE_COUNT;
             bool        is_array = false;
             uint64_t    n        = 1;
 

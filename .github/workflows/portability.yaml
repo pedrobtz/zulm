@@ -42,6 +42,14 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::testthat, any::withr
+      - name: A library of its own for zulm
+        # builds of zulm stay out of the cached dependency library that
+        # other jobs restore: a -march=native build there crashed covr's
+        # merge with an illegal instruction on another runner's CPU
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/zulm-lib"
+          echo "R_LIBS=$RUNNER_TEMP/zulm-lib" >> "$GITHUB_ENV"
       - name: install with the hooks set
         shell: bash
         env:

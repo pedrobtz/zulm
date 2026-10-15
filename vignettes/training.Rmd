@@ -1,0 +1,191 @@
+---
+title: "Training a model"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Training a model}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6, fig.height = 3.5)
+```
+
+This vignette trains a small generative model of event sequences, the
+model that sized zulm's design: a causal transformer encoder reads a
+history of events, a classifier predicts the kind of the next event,
+and a flow-matching head learns the distribution of its seven values.
+It then shows that training reproduces bit for bit at another thread
+count, and draws samples from the trained head.
+
+```{r}
+library(zulm)
+zl_seed(1)
+```
+
+## Data
+
+Events come from a synthetic marked process. Their kinds follow a
+Markov chain over four states; their values follow an autoregression
+around a mean that depends on the kind. A batch holds 16 sequences of
+64 events. Each event's features are its kind, one-hot, and four of its
+values; the targets are the next event's kind and values.
+
+```{r}
+synth_batch <- function(step, n = 64L, b = 16L) {
+  set.seed(1000L + step)
+  trans <- matrix(c(
+    .85, .05, .05, .05,
+    .10, .80, .05, .05,
+    .05, .10, .80, .05,
+    .05, .05, .10, .80
+  ), 4, byrow = TRUE)
+  mu <- matrix(c(
+    1, -1, 0.5, 0, 2, -0.5, 1, -1, 1, 0, -1, 0.5, 1, 0,
+    0.5, -1, 2, 0, 1, -1, 0, 1, -1, 1, 0, -1, 0.5, 2
+  ), 7, 4)
+  kinds <- matrix(0L, n + 1L, b)
+  y <- array(0, c(7, n + 1L, b))
+  for (j in seq_len(b)) {
+    k <- sample.int(4L, 1L)
+    prev <- rep(0, 7)
+    for (t in seq_len(n + 1L)) {
+      k <- sample.int(4L, 1L, prob = trans[k, ])
+      prev <- 3 * mu[, k] + 0.5 * prev + 0.1 * stats::rnorm(7)
+      kinds[t, j] <- k - 1L
+      y[, t, j] <- prev
+    }
+  }
+  hist <- seq_len(n)
+  feat <- array(0, c(8, n, b))
+  for (j in seq_len(b)) {
+    feat[cbind(kinds[hist, j] + 1L, hist, j)] <- 1
+    feat[5:8, , j] <- y[1:4, hist, j]
+  }
+  kind <- kinds[hist + 1L, , drop = FALSE]
+  list(
+    feat = feat,
+    kind = kind,
+    kind_prob = array(diag(4)[, kind + 1L], c(4, n, b)),
+    t = array(stats::runif(n * b), c(1, n, b)),
+    y = y[, hist + 1L, , drop = FALSE]
+  )
+}
+```
+
+## The model
+
+Modules declare their parameters in a store and return functions that
+apply them inside a graph. The encoder is one causal transformer block
+of width 64 with four heads; the flow head is conditioned on the
+encoder's state, the next kind and the flow time through adaptive layer
+normalisation.
+
+```{r}
+p <- zl_params()
+m <- list(
+  emb = zl_linear(p, "in", n_in = 8, n_out = 64),
+  blk = zl_block(p, "enc", dim = 64, heads = 4, causal = TRUE),
+  ln = zl_norm(p, "enc.ln", 64),
+  kind = zl_linear(p, "kind", 64, 4),
+  kind_emb = zl_embedding(p, "kind.emb", 4, 64),
+  ada = zl_adaln(p, "flow.ada", dim = 64, cond_dim = 64),
+  flow_in = zl_linear(p, "flow.in", 7, 64),
+  flow_out = zl_linear(p, "flow.out", 64, 7)
+)
+zl_param_count(p)
+
+# the velocity of the flow at x_t and time t, given the encoder's state z
+velocity <- function(z, kind, x_t, t) {
+  cond <- z + m$kind_emb(kind) + zl_time_embedding(t, 64)
+  m$flow_out(zl_silu(m$ada(zl_rms_norm(m$flow_in(x_t)), cond)))
+}
+```
+
+The loss adds the kind's cross-entropy to the flow-matching loss: noise
+`eps` is drawn inside the graph, the targets are interpolated towards it
+at time `t`, and the head learns the velocity `y - eps`.
+
+```{r}
+build <- function(x) {
+  z <- m$ln(m$blk(m$emb(x$feat)))
+  ce <- zl_cross_entropy(m$kind(z), x$kind_prob)
+  eps <- zl_noise_normal(c(7, 64, 16), "x0")
+  x_t <- (1 - x$t) * eps + x$t * x$y
+  v <- velocity(z, x$kind, x_t, x$t)
+  list(loss = ce + zl_mse(v, x$y - eps))
+}
+inputs <- list(
+  feat = c(8, 64, 16), kind = zl_int(64, 16), kind_prob = c(4, 64, 16),
+  t = c(1, 64, 16), y = c(7, 64, 16)
+)
+g <- zl_graph(build, p, inputs, loss = "loss")
+g
+```
+
+## Training
+
+A trainer pairs the graph with an optimiser. Each `zl_step()` writes a
+batch into the graph's inputs, computes the loss and its gradients, and
+updates the parameters in place.
+
+```{r}
+tr <- zl_trainer(g, zl_adamw(lr = 1e-3))
+losses <- vapply(seq_len(300), function(i) zl_step(tr, synth_batch(i)), numeric(1))
+plot(losses, type = "l", xlab = "step", ylab = "loss", log = "y")
+```
+
+## Reproducibility
+
+The noise inside the graph comes from 'zurand' under keys derived from
+the session key, the stream's name and the step, and reported losses
+are fixed-order sums. So a run at two threads gives the same bits as a
+run at one:
+
+```{r}
+run <- function(threads) {
+  old <- zl_threads(threads)
+  on.exit(zl_threads(old))
+  zl_seed(7)
+  q <- zl_params()
+  zl_param(q, "w", c(8, 4))
+  h <- zl_graph(
+    function(x) list(loss = zl_mse(zl_crossprod(zl_param_tensor(q, "w"), x$a) + zl_noise_normal(c(4, 32), "e"), x$b)),
+    q,
+    inputs = list(a = c(8, 32), b = c(4, 32)),
+    loss = "loss"
+  )
+  t2 <- zl_trainer(h, zl_adamw(lr = 1e-2))
+  vapply(1:20, function(i) zl_step(t2, list(a = matrix(sin(1:256 + i), 8), b = matrix(cos(1:128 * i), 4))), 0)
+}
+identical(run(1), run(2))
+```
+
+## Sampling
+
+To draw the next event's values, integrate the learned velocity from
+noise at `t = 0` to `t = 1`. A forward-only graph evaluates the head;
+Euler steps in R move the sample.
+
+```{r}
+head_graph <- zl_graph(
+  function(x) velocity(m$ln(m$blk(m$emb(x$feat))), x$kind, x$x, x$t),
+  p,
+  inputs = list(feat = c(8, 64, 16), kind = zl_int(64, 16), x = c(7, 64, 16), t = c(1, 64, 16))
+)
+batch <- synth_batch(10000L)
+x <- array(zl_rng_normal(c(7, 64, 16), "sample"), c(7, 64, 16))
+steps <- 20
+for (s in seq_len(steps) - 1) {
+  v <- zl_forward(head_graph, list(
+    feat = batch$feat, kind = batch$kind, x = x, t = array(s / steps, c(1, 64, 16))
+  ))$output
+  x <- x + v / steps
+}
+# how the sampled values follow the true ones, value by value, over all
+# 1 024 events
+round(vapply(1:7, function(d) cor(as.vector(x[d, , ]), as.vector(batch$y[d, , ])), 0), 2)
+```
+
+The samples are draws, not predictions, but here the history determines
+most of the next event, so they follow the true values closely.
