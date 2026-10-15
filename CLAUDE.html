@@ -145,6 +145,14 @@
 <p><code>devtools::document()</code> and <code>devtools::check()</code> clean, meaning 0 errors, 0 warnings and 0 notes. The one allowed note is “New submission” before the first release. <code>devtools::test(shuffle = TRUE)</code> green. <code>gctorture(TRUE)</code> clean when C changed. CI green on every leg. A user-facing change also needs a test, roxygen documentation and a <code>NEWS.md</code> entry.</p>
 </div>
 <div class="section level2">
+<h2 id="quick-checks-a-full-run-before-submission">Quick checks, a full run before submission<a class="anchor" aria-label="anchor" href="#quick-checks-a-full-run-before-submission"></a></h2>
+<p>Every pull request and every push runs the quick profile, each job within about five minutes:</p>
+<ul><li>gctorture runs the <strong>smoke set</strong> (<code>ZULM_TESTS=smoke</code>): <code>tests/testthat/_smoke.txt</code>, the cheapest tests that make every kind of call into the C code. It tortures R’s collector only inside zulm’s <code><a href="https://rdrr.io/r/base/CallExternal.html" class="external-link">.Call()</a></code>s (<code>ZULM_GCTORTURE</code>, <code>R/load.R</code>), each kind of call once. Rerun <code>Rscript tools/smoke-tests.R</code> after adding tests or C entry points, and commit the file.</li>
+<li>the fuzz targets run a minute each; rchk and the analyzers as always;</li>
+<li>the sanitizers, valgrind, LTO, cran-special, coverage on pull requests and the <code>measure</code> benchmarks do not run: their setup alone takes longer.</li>
+</ul><p>The <strong>full run</strong> (every check on the whole suite and every variant, an hour of fuzzing per target, coverage, the §12 benchmarks) is dispatched with <code>full: true</code> on <code>native-checks</code>, <code>fuzz</code>, <code>coverage</code> and <code>measure</code>, or given to a pull request with the <code>full-ci</code> label. It is required before submission (Stage 14), and worth it for a pull request that changes how the C glue handles R objects; say in the pull request why. A finding is fixed in a follow-up pull request.</p>
+</div>
+<div class="section level2">
 <h2 id="releasing-to-cran">Releasing to CRAN<a class="anchor" aria-label="anchor" href="#releasing-to-cran"></a></h2>
 <ul><li>
 <strong>CI is the pre-submission check.</strong> The <code>pedrobtz/r-actions</code> R CMD check runs <code>--as-cran</code> on the CRAN-like runners and containers, and it replaces win-builder, the macOS builder and R-hub. <code>cran-comments.md</code> lists the CI legs as its test environments.</li>

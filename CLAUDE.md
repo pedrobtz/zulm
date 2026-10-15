@@ -193,6 +193,31 @@ the first release. `devtools::test(shuffle = TRUE)` green.
 user-facing change also needs a test, roxygen documentation and a
 `NEWS.md` entry.
 
+## Quick checks, a full run before submission
+
+Every pull request and every push runs the quick profile, each job
+within about five minutes:
+
+- gctorture runs the **smoke set** (`ZULM_TESTS=smoke`):
+  `tests/testthat/_smoke.txt`, the cheapest tests that make every kind
+  of call into the C code. It tortures R’s collector only inside zulm’s
+  [`.Call()`](https://rdrr.io/r/base/CallExternal.html)s
+  (`ZULM_GCTORTURE`, `R/load.R`), each kind of call once. Rerun
+  `Rscript tools/smoke-tests.R` after adding tests or C entry points,
+  and commit the file.
+- the fuzz targets run a minute each; rchk and the analyzers as always;
+- the sanitizers, valgrind, LTO, cran-special, coverage on pull requests
+  and the `measure` benchmarks do not run: their setup alone takes
+  longer.
+
+The **full run** (every check on the whole suite and every variant, an
+hour of fuzzing per target, coverage, the §12 benchmarks) is dispatched
+with `full: true` on `native-checks`, `fuzz`, `coverage` and `measure`,
+or given to a pull request with the `full-ci` label. It is required
+before submission (Stage 14), and worth it for a pull request that
+changes how the C glue handles R objects; say in the pull request why. A
+finding is fixed in a follow-up pull request.
+
 ## Releasing to CRAN
 
 - **CI is the pre-submission check.** The `pedrobtz/r-actions` R CMD
