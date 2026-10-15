@@ -37,6 +37,11 @@ double zlm_rowloss_value(const zlm_rowloss *rl);
 
 SEXP zlm_zurand_init(void);
 SEXP zlm_zurand_version_ok(SEXP version);
+/* The C table's named streams (design §8). */
+int zlm_rng_stream_register(const char *name, char *msg, size_t cap);
+int zlm_rng_stream_draw(const char *name, uint32_t step, uint64_t offset, int dist, float *dst,
+                        int64_t n, char *msg, size_t cap);
+SEXP zlm_rng_streams_clear(void);
 SEXP zlm_rng_draw(SEXP stream_key, SEXP step, SEXP offset, SEXP n, SEXP dist);
 
 #endif

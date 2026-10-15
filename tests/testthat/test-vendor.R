@@ -2,11 +2,6 @@
 # source tree is only reachable from a development checkout; CI also runs
 # tools/verify-ggml on every pull request.
 
-ggml_tree <- function() {
-  src <- testthat::test_path("..", "..", "src", "ggml")
-  if (dir.exists(src)) normalizePath(src) else ""
-}
-
 test_that("the vendored tree carries no diagnostic pragma", {
   tree <- ggml_tree()
   skip_if(!nzchar(tree), "source tree not available")

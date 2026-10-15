@@ -31,7 +31,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | 9 | [State tensors and the graph cache](#stage-9--state-tensors-and-the-graph-cache) | [#11](https://github.com/pedrobtz/zulm/issues/11) | [#30](https://github.com/pedrobtz/zulm/pull/30) | 2026-10-14 |
 | 10 | [Flash attention](#stage-10--flash-attention) | [#12](https://github.com/pedrobtz/zulm/issues/12) | [#31](https://github.com/pedrobtz/zulm/pull/31) | 2026-10-14 |
 | 11 | [Arrow batches](#stage-11--arrow-batches) | [#13](https://github.com/pedrobtz/zulm/issues/13) | [#32](https://github.com/pedrobtz/zulm/pull/32) | 2026-10-15 |
-| 12 | [The C table and the zukzeit proof](#stage-12--the-c-table-and-the-zukzeit-proof) | [#14](https://github.com/pedrobtz/zulm/issues/14) | | |
+| 12 | [The C table and the zukzeit proof](#stage-12--the-c-table-and-the-zukzeit-proof) | [#14](https://github.com/pedrobtz/zulm/issues/14) | [#33](https://github.com/pedrobtz/zulm/pull/33) | 2026-10-15 |
 | 13 | [Fuzzing, benchmarks and documentation](#stage-13--fuzzing-benchmarks-and-documentation) | [#15](https://github.com/pedrobtz/zulm/issues/15) | | |
 | 14 | [v0.1.0 readiness](#stage-14--v010-readiness) | [#16](https://github.com/pedrobtz/zulm/issues/16) | | |
 
@@ -636,6 +636,19 @@ zulm with its parity fixtures green.
   clear message.
 
 **Design.** §7.8, §7.9, §8; D8, D25, D33; the §15 criteria 7 and 10.
+
+**Deviations (2026-10-15).** "A consumer compiled against a shorter
+table version is refused" is read with §8's append-only rule: the
+header's `zulm_api_get()` refuses an installed table shorter than the
+header the consumer was built against, and a consumer built against an
+older, shorter header keeps working. `zulm.h` names the return codes
+(`ZULM_E*`), the element types (`ZULM_TYPE_*`) and `ZULM_END`, which
+`batch_fill` returns at the end of the stream; an Arrow error there is
+`ZULM_EFAILED` with its message. `ggml_version()` lists every vendored
+patch, as `"0.26.0+p1,p2,p7,p8,p9,p10"`. The table has no output-shape
+member: a consumer knows the shapes of the graph it built in R. The
+zukzeit branch, `zulm-runtime`, drives zulm from R, as §7.9 expects of a
+first port; it uses nothing from the table.
 
 ## Stage 13 — Fuzzing, benchmarks and documentation
 

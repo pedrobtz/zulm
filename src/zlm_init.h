@@ -27,6 +27,7 @@ SEXP zlm_log_emit(SEXP level, SEXP text);
 void zlm_ggml_log(enum ggml_log_level level, const char *text, void *user);
 SEXP zlm_engine_selftest(SEXP valid);
 SEXP zlm_bench_mul_mat(SEXP n, SEXP reps, SEXP threads);
+SEXP zlm_api_register(void);
 
 #define ZLM_STR2(x) #x
 #define ZLM_STR(x) ZLM_STR2(x)
@@ -91,6 +92,8 @@ static const R_CallMethodDef zlm_call_methods[] = {
   {"zlm_batch_fill", (DL_FUNC) &zlm_batch_fill, 2},
   {"zlm_arrow_state", (DL_FUNC) &zlm_arrow_state, 1},
   {"zlm_arrow_test_stream", (DL_FUNC) &zlm_arrow_test_stream, 3},
+  {"zlm_api_register", (DL_FUNC) &zlm_api_register, 0},
+  {"zlm_rng_streams_clear", (DL_FUNC) &zlm_rng_streams_clear, 0},
   {NULL, NULL, 0}
 };
 
