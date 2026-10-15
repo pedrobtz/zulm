@@ -1848,6 +1848,18 @@ now.
 | P10 | type-table functions called through their own types | UB (below) | none: vendored |
 | P11 | GGUF key type checked before it is a `gguf_type` | UB (below) | none: vendored |
 
+**Status, Stage 14 (2026-10-15).** Every vendored bug fix now has an
+upstream issue, each with a reproducer run against ggml `master`
+(a05c992, v0.27.0) and the patch shown to fix it there:
+[ggml#1660](https://github.com/ggml-org/ggml/issues/1660) (P9, P11),
+[ggml#1661](https://github.com/ggml-org/ggml/issues/1661) (P10),
+[ggml#1662](https://github.com/ggml-org/ggml/issues/1662) (P8),
+[ggml#1663](https://github.com/ggml-org/ggml/issues/1663) (P1, P2). The
+gradients through permutations that §6.2's pre-check refuses are
+[ggml#1664](https://github.com/ggml-org/ggml/issues/1664). P7 is a
+feature, with no issue. Pull requests, which upstream takes in
+llama.cpp, wait for the maintainers' answer.
+
 **Status, Stage 13 (2026-10-15).** The fuzz targets (§11) found two
 more. P11: `gguf_init_from_reader()` read a key-value pair's type into
 a `gguf_type` before rejecting unknown ones, and started the variable
@@ -2657,7 +2669,7 @@ job that holds it:
 | 2 | `test-acceptance.R` in the `acceptance` workflow: loss ratio 18 %, bit-identical at one and two threads | met |
 | 3 | `test-grad.R`, `test-fixtures.R`, `test-train.R` ("clip_norm scales every gradient …") | met |
 | 4 | `test-hostile.R`, `test-graph-hostile.R`, `test-fuzz-findings.R`; the `fuzz` workflow | met |
-| 5 | `vendor` workflow and `tools/verify-ggml` (byte for byte); `test-train.R` (patches vendored) | **open**: no patch has an upstream pull request yet (§9.3) |
+| 5 | `vendor` workflow and `tools/verify-ggml` (byte for byte); `test-train.R` (patches vendored) | **partly**: every bug fix has an upstream issue (§9.3, ggml#1660–1663); no pull request yet |
 | 6 | `measure` workflow, `targets` job (§12) | **partly**: the `avx2` variant loads and the product target is met; the §1.1 step misses by 1.7 ms and two inference targets miss, recorded in §12 |
 | 7 | `test-c-table.R` (the `zulmclient` fixture package) | met |
 | 8 | `vendor` workflow and `tools/verify-ggml` (no pragma); `build-flags` (only `R_init_` exported, three platforms) | met |
