@@ -3,6 +3,12 @@ on:
     branches: [main, master]
   pull_request:
     types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+    inputs:
+      full:
+        description: The full profile, as before submission
+        type: boolean
+        default: false
 
 name: native-checks
 
@@ -12,16 +18,26 @@ concurrency:
 
 # The native checks of pedrobtz/r-actions for zulm's C and C++, vendored ggml
 # included (CRAN runs its sanitizer, valgrind and LTO flavours on all of it).
-# `profile` goes to the three workflows it changes: quick skips the asan
-# containers, valgrind and cran-special. gctorture has its own switch,
-# below. lto, rchk and analyzers take minutes either way and run on every
-# push.
+#
+# Quick on every pull request and push, each job within about five minutes:
+# the sanitizers and gctorture run the smoke set (ZULM_TESTS=smoke, the 24
+# tests that make every kind of call into the C code, tools/smoke-tests.R),
+# the sanitizers on one build (ZULM_CFLAGS: the native hook's single
+# variant), gctorture tortures each kind of call once; valgrind, the ASan
+# containers and cran-special are skipped. Full before submission
+# (CLAUDE.md): dispatched with full: true, or a pull request labelled
+# full-ci: the whole suite, every variant, every job. lto, rchk and
+# analyzers take minutes either way and run the same.
 jobs:
   sanitizers:
     uses: pedrobtz/r-actions/.github/workflows/sanitizers.yml@v1
     with:
       asan: true
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      profile: ${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 'full' || 'quick' }}
+      env: |
+        ZULM_TESTS=${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 'all' || 'smoke' }}
+        ZULM_CFLAGS=${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '' || '-g' }}
+        ZULM_CXXFLAGS=${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '' || '-g' }}
 
   valgrind:
     uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
@@ -32,27 +48,24 @@ jobs:
       timeout-minutes: 300
       # glibc's thread-local storage of live threads (tools/valgrind.supp)
       suppressions: tools/valgrind.supp
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      profile: ${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 'full' || 'quick' }}
 
   lto:
     uses: pedrobtz/r-actions/.github/workflows/lto.yml@v1
 
   # R's collector is forced only inside zulm's .Call()s, where a missing
   # PROTECT can bite (ZULM_GCTORTURE, R/load.R), not over testthat and R
-  # loops. Every pull request runs the targeted pass: every allocation, the
-  # first three calls of each routine and argument types, about ten
-  # minutes. The long pass, every call at step 20, runs after a merge on
-  # main, and on a pull request labelled gctorture-full, a label given
-  # when the pull request changes how the glue handles R objects; what the
-  # long pass finds on main is fixed there. r-actions' own gctorture2() is
-  # off (step 0) so that it does not torture everything else.
+  # loops; r-actions' own gctorture2() is off (step 0). Quick: the smoke
+  # set, each kind of call tortured once at every allocation. Full: the
+  # whole suite, each kind of call three times.
   gctorture:
     uses: pedrobtz/r-actions/.github/workflows/gctorture.yml@v1
     with:
       step: 0
       quick-step: 0
       env: |
-        ZULM_GCTORTURE=${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'gctorture-full') && '1,3' || '20,0' }}
+        ZULM_TESTS=${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 'all' || 'smoke' }}
+        ZULM_GCTORTURE=${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '1,3' || '1,1' }}
 
   # zurand, which zulm links to, is not on CRAN yet; rchk's image installs
   # only from CRAN.
@@ -74,4 +87,4 @@ jobs:
   cran-special:
     uses: pedrobtz/r-actions/.github/workflows/cran-special.yml@v1
     with:
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      profile: ${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 'full' || 'quick' }}

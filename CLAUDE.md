@@ -182,23 +182,29 @@ release. `devtools::test(shuffle = TRUE)` green. `gctorture(TRUE)` clean when C
 changed. CI green on every leg. A user-facing change also needs a test, roxygen
 documentation and a `NEWS.md` entry.
 
-## Long native checks, decided per pull request
+## Quick checks, a full run before submission
 
-Every pull request runs the quick profile and a targeted gctorture pass
-(`ZULM_GCTORTURE=1,3`: R's collector forced only inside zulm's `.Call()`s,
-the first three calls of each routine and argument types). The long runs
-happen on `main` after each merge, and on a pull request only when its
-change calls for them:
+Every pull request and every push runs the quick profile, each job within
+about five minutes:
 
-- **`gctorture-full`**: the pull request changes how the C glue handles R
-  objects (allocations, `PROTECT`, `.Call` entry points, external pointers
-  and finalizers, R callbacks from C).
-- **`full-ci`**: it changes compiled code that valgrind and the ASan
-  containers should see, or Windows-only code or `Suggests` guards.
+- the sanitizers and gctorture run the **smoke set**
+  (`ZULM_TESTS=smoke`): `tests/testthat/_smoke.txt`, the cheapest tests
+  that make every kind of call into the C code. Rerun
+  `Rscript tools/smoke-tests.R` after adding tests or C entry points, and
+  commit the file.
+- gctorture tortures R's collector only inside zulm's `.Call()`s
+  (`ZULM_GCTORTURE`, `R/load.R`), each kind of call once;
+- the fuzz targets run a minute each;
+- valgrind, the ASan containers, cran-special, coverage on pull requests
+  and the `measure` benchmarks do not run.
 
-Say in the pull request which you chose and why. A finding on `main` is
-fixed in a follow-up pull request; it does not block the next stage
-unless `main` stays red.
+The **full run** (whole suite, every variant, valgrind, an hour of fuzzing
+per target, coverage, the §12 benchmarks) is dispatched with `full: true`
+on `native-checks`, `fuzz`, `coverage` and `measure`, or given to a pull
+request with the `full-ci` label. It is required before submission
+(Stage 14), and worth it for a pull request that changes how the C glue
+handles R objects; say in the pull request why. A finding is fixed in a
+follow-up pull request.
 
 ## Releasing to CRAN
 

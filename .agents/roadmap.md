@@ -714,7 +714,9 @@ the "pretrained block".
   environments.
 - The `pkg-cran-review` skill run, every finding resolved.
 - `urlchecker::url_check()` and `spelling::spell_check_package()` clean.
-- A full-profile r-actions run green on the release commit.
+- A full-profile r-actions run green on the release commit: every workflow
+  dispatched with `full: true`, or the readiness pull request labelled
+  `full-ci` (CLAUDE.md, "Quick checks, a full run before submission").
 
 **Exit criteria.**
 - All of the above hold on the release commit.

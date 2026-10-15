@@ -5,9 +5,12 @@
 # §12 targets, on an AVX2 runner: the shipped build, then the native hook.
 # Informational: the numbers go to the job summary and into the design by
 # hand.
+#
+# Measurements, not checks: dispatched, as in the full run before
+# submission, or on a pull request labelled full-ci.
 on:
   pull_request:
-    paths: ['src/**', 'R/**', 'tools/bench-variants.R', 'tools/run-benchmarks', '.github/workflows/measure.yaml']
+    types: [labeled]
   workflow_dispatch:
 
 name: measure
@@ -21,6 +24,7 @@ concurrency:
 
 jobs:
   measure:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'full-ci'
     strategy:
       fail-fast: false
       matrix:
@@ -100,6 +104,7 @@ jobs:
           Rscript tools/bench-variants.R plain
 
   targets:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'full-ci'
     runs-on: ubuntu-latest
     name: targets (ubuntu-latest, gcc)
     env:

@@ -1,7 +1,10 @@
+# Coverage runs the whole suite on all variants (about 26 minutes), so not
+# on pull requests: after each merge to main, where it also updates the
+# badge, and when dispatched, as in the full run before submission.
 on:
   push:
     branches: [main, master]
-  pull_request:
+  workflow_dispatch:
 
 name: coverage
 
