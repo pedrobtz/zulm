@@ -12,7 +12,9 @@ test_that("ZULM_GCTORTURE is read as a step and a per-call limit", {
   expect_identical(zlm$torture$limit, 0L)
   setup("")
   expect_null(zlm$torture)
-  for (bad in c("0", "x", "1,-1", "1,2,3")) {
+  setup("0")
+  expect_identical(zlm$torture$step, 0L)
+  for (bad in c("-1", "x", "1,-1", "1,2,3")) {
     expect_error(setup(bad), class = "zulm_invalid_argument")
   }
 })
@@ -29,5 +31,6 @@ test_that("a tortured call returns what an untortured one does", {
   tortured <- lapply(1:4, function(i) zl_forward(g, list(a = c(-1, 0.5, 2))))
   expect_identical(tortured, rep(list(plain), 4))
   expect_true(length(ls(zlm$torture$seen)) > 0)
-  expect_true(all(unlist(mget(ls(zlm$torture$seen), zlm$torture$seen)) <= 2L))
+  # every call is counted; only the first two of each kind were tortured
+  expect_true(max(unlist(mget(ls(zlm$torture$seen), zlm$torture$seen))) >= 4L)
 })

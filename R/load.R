@@ -155,16 +155,17 @@ zlm_call_quiet <- function(name, ...) {
 #   ZULM_GCTORTURE=<step>[,<limit>]
 #
 # collects every `step` allocations inside the first `limit` calls of each
-# (routine, argument types); a limit of 0 tortures every call. Unset, as on
-# CRAN, nothing is tortured.
+# (routine, argument types); a limit of 0 tortures every call. A step of 0
+# tortures nothing and only records the calls, which tools/smoke-tests.R
+# reads. Unset, as on CRAN, nothing is tortured or recorded.
 zlm_torture_setup <- function(spec) {
   .zlm$torture <- NULL
   if (!nzchar(spec)) {
     return(invisible(NULL))
   }
   v <- suppressWarnings(as.integer(strsplit(spec, ",", fixed = TRUE)[[1L]]))
-  if (length(v) < 1L || length(v) > 2L || anyNA(v) || v[[1L]] < 1L || (length(v) == 2L && v[[2L]] < 0L)) {
-    zlm_abort("ZULM_GCTORTURE must be <step> or <step>,<limit> with step >= 1 and limit >= 0.", "zulm_invalid_argument")
+  if (length(v) < 1L || length(v) > 2L || anyNA(v) || v[[1L]] < 0L || (length(v) == 2L && v[[2L]] < 0L)) {
+    zlm_abort("ZULM_GCTORTURE must be <step> or <step>,<limit> with step and limit >= 0.", "zulm_invalid_argument")
   }
   .zlm$torture <- list(
     step = v[[1L]],
@@ -176,14 +177,14 @@ zlm_torture_setup <- function(spec) {
 
 zlm_tortured_call <- function(r, name, ...) {
   t <- .zlm$torture
-  if (t$limit > 0L) {
+  if (t$limit > 0L || t$step == 0L) {
     key <- paste(c(name, vapply(list(...), typeof, "")), collapse = " ")
     n <- t$seen[[key]]
     n <- if (is.null(n)) 0L else n
-    if (n >= t$limit) {
+    t$seen[[key]] <- n + 1L
+    if (t$step == 0L || (t$limit > 0L && n >= t$limit)) {
       return(zlm_dot_call(r, ...))
     }
-    t$seen[[key]] <- n + 1L
   }
   old <- gctorture2(t$step)
   on.exit(gctorture2(old))

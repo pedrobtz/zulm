@@ -1,0 +1,26 @@
+# Written by tools/smoke-tests.R; do not edit. One test description
+# per line: 24 of 175 tests, 0.3 of 119.4 seconds, all 66 kinds of call.
+an iterator is checked against its map
+array offsets are honoured
+a sampler loop in C equals zl_forward() on zl_rng_normal() draws
+batch_fill() runs a graph over an Arrow stream as zl_forward() does
+a ggml assertion during construction is zulm_engine_error
+ggml's log drains into records of a level and a text
+flash attention has no gradient and checks its operands
+ggml's log reaches R as zulm_message at the chosen level
+a freed store is stale
+index values convert to int32 and refuse NA
+zl_adaln() and zl_time_embedding() match R
+in-graph draws equal the R draws, at every thread count and split
+a PyTorch file loads with [out, in] as c(in, out), no transposition
+offset writes land where documented and refuse to overrun
+states are not saved
+state writes across heads use one row index per slice
+the C offset write into an input lands where documented
+the graph cache builds once per shape and evicts under the cap
+resizing the pool under live graphs and trainers is safe
+an SGD step moves parameters by -lr times the gradient
+zl_reset() restarts AdamW from fresh state
+trainer arguments are checked
+patches P1, P2 and P7 are vendored, and their cases train
+options(zulm.variant =) forces each usable variant
