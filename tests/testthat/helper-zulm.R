@@ -1,3 +1,6 @@
+# zulm's internal .Call wrapper, for routines the tests reach directly.
+zlm_call <- function(...) getFromNamespace("zlm_call", "zulm")(...)
+
 # Rounds doubles to the nearest single-precision value, as zulm stores f32.
 f32 <- function(x) {
   readBin(writeBin(as.double(x), raw(), size = 4), "double", n = length(x), size = 4)
