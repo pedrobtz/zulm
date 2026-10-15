@@ -30,14 +30,17 @@ functions); \code{NULL} for none.}
 \item{outputs}{The names of the outputs to keep, of those \code{build()}
 returns; \code{NULL} for all.}
 
-\item{...}{Dimensions, for \code{zl_int()}.}
+\item{...}{Dimensions, for \code{zl_int()}; or, in the \code{map} of
+\code{\link[=zl_arrow_batches]{zl_arrow_batches()}}, the names of integer columns.}
 
 \item{g}{A graph; for \code{zl_forward()}, also a graph cache from
 \code{\link[=zl_graph_cache]{zl_graph_cache()}}.}
 
 \item{data}{A named list of arrays, one per input, each matching its
 input's dimensions exactly (a plain vector for a one-dimensional
-input). \code{NA} is refused.}
+input). \code{NA} is refused. Or an iterator from \code{\link[=zl_arrow_batches]{zl_arrow_batches()}},
+whose next batch is written straight into the inputs; \code{zl_forward()}
+then returns \code{NULL} once the stream has ended.}
 }
 \value{
 \code{zl_graph()} returns a graph of class \code{zl_graph}; \code{zl_int()} an

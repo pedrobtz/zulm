@@ -30,7 +30,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | 8 | [safetensors and weight types](#stage-8--safetensors-and-weight-types) | [#10](https://github.com/pedrobtz/zulm/issues/10) | [#29](https://github.com/pedrobtz/zulm/pull/29) | 2026-10-14 |
 | 9 | [State tensors and the graph cache](#stage-9--state-tensors-and-the-graph-cache) | [#11](https://github.com/pedrobtz/zulm/issues/11) | [#30](https://github.com/pedrobtz/zulm/pull/30) | 2026-10-14 |
 | 10 | [Flash attention](#stage-10--flash-attention) | [#12](https://github.com/pedrobtz/zulm/issues/12) | [#31](https://github.com/pedrobtz/zulm/pull/31) | 2026-10-14 |
-| 11 | [Arrow batches](#stage-11--arrow-batches) | [#13](https://github.com/pedrobtz/zulm/issues/13) | | |
+| 11 | [Arrow batches](#stage-11--arrow-batches) | [#13](https://github.com/pedrobtz/zulm/issues/13) | [#32](https://github.com/pedrobtz/zulm/pull/32) | 2026-10-15 |
 | 12 | [The C table and the zukzeit proof](#stage-12--the-c-table-and-the-zukzeit-proof) | [#14](https://github.com/pedrobtz/zulm/issues/14) | | |
 | 13 | [Fuzzing, benchmarks and documentation](#stage-13--fuzzing-benchmarks-and-documentation) | [#15](https://github.com/pedrobtz/zulm/issues/15) | | |
 | 14 | [v0.1.0 readiness](#stage-14--v010-readiness) | [#16](https://github.com/pedrobtz/zulm/issues/16) | | |
@@ -586,6 +586,19 @@ and chunk rules of design §7.3.
   and giving `zulm_companion_error` where documented.
 
 **Design.** §7.3; D17, D21; open question 14.
+
+**Deviations (2026-10-14).** The DuckDB and Parquet fixtures run as
+`tools/acceptance/arrow-duckdb.R` in the acceptance workflow, not as
+package tests: `duckdb` in `Suggests` would be built from source,
+instrumented, in the sanitizer images. The Parquet file is written by
+DuckDB at run time rather than committed. The package tests use
+nanoarrow streams and a counting stream in C, which also runs without
+nanoarrow. `map` marks integer inputs with `zl_int()` around column
+names, which the design left open. A dictionary that changes between
+record batches is an error; levels given up front are not offered.
+Dictionary codes may be unsigned, as DuckDB's are. The R CMD check
+caller now runs r-actions' `nosuggests` leg, and the acceptance workflow
+a job without nanoarrow.
 
 ## Stage 12 — The C table and the zukzeit proof
 

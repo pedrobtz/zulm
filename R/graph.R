@@ -25,12 +25,15 @@
 #'   functions); `NULL` for none.
 #' @param outputs The names of the outputs to keep, of those `build()`
 #'   returns; `NULL` for all.
-#' @param ... Dimensions, for `zl_int()`.
+#' @param ... Dimensions, for `zl_int()`; or, in the `map` of
+#'   [zl_arrow_batches()], the names of integer columns.
 #' @param g A graph; for `zl_forward()`, also a graph cache from
 #'   [zl_graph_cache()].
 #' @param data A named list of arrays, one per input, each matching its
 #'   input's dimensions exactly (a plain vector for a one-dimensional
-#'   input). `NA` is refused.
+#'   input). `NA` is refused. Or an iterator from [zl_arrow_batches()],
+#'   whose next batch is written straight into the inputs; `zl_forward()`
+#'   then returns `NULL` once the stream has ended.
 #' @return `zl_graph()` returns a graph of class `zl_graph`; `zl_int()` an
 #'   input specification; `zl_forward()` a named list of double arrays;
 #'   `zl_graph_info()` a list describing the graph.
@@ -95,7 +98,12 @@ zl_graph <- function(build, p, inputs, loss = NULL, outputs = NULL) {
 #' @rdname zl_graph
 #' @export
 zl_int <- function(...) {
-  dim <- zlm_check_dim(c(...))
+  x <- c(...)
+  if (is.character(x)) {
+    # column names, in the map of zl_arrow_batches()
+    return(structure(list(cols = x), class = "zl_int_cols"))
+  }
+  dim <- zlm_check_dim(x)
   structure(list(dim = dim), class = "zl_int_spec")
 }
 
@@ -158,10 +166,15 @@ zlm_check_outputs <- function(res, loss, outputs) {
 #' @export
 zl_forward <- function(g, data, outputs = NULL) {
   if (inherits(g, "zl_graph_cache")) {
+    if (inherits(data, "zl_arrow_batches")) {
+      zlm_abort("A graph cache takes arrays, whose shapes choose the graph, not an iterator.", "zulm_invalid_argument")
+    }
     g <- zlm_cache_graph(g, data)
   }
   zlm_check_graph(g)
-  zlm_write_inputs(g, data)
+  if (!zlm_write_inputs(g, data)) {
+    return(NULL)
+  }
   which <- zlm_output_index(g, outputs)
   vals <- zlm_call("zlm_graph_compute", g$ptr, which - 1L)
   names(vals) <- g$outputs$names[which]
@@ -192,7 +205,12 @@ zlm_output_index <- function(g, outputs) {
   match(outputs, g$outputs$names)
 }
 
+# Writes `data` into the graph's inputs; FALSE when `data` is an iterator
+# whose stream has ended.
 zlm_write_inputs <- function(g, data) {
+  if (inherits(data, "zl_arrow_batches")) {
+    return(zlm_call("zlm_batch_fill", g$ptr, data$ptr))
+  }
   spec <- g$inputs
   if (!is.list(data) || is.null(names(data)) || !setequal(names(data), spec$names) ||
     anyDuplicated(names(data))) {
@@ -222,7 +240,7 @@ zlm_write_inputs <- function(g, data) {
     }
     zlm_call("zlm_graph_set_input", g$ptr, i - 1L, v)
   }
-  invisible(g)
+  TRUE
 }
 
 zlm_check_graph <- function(g) {

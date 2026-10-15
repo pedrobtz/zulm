@@ -6,3 +6,10 @@ src/ggml/
   with the patches listed in src/ggml/VERSION.
   Copyright (c) 2023-2026 The ggml authors.
   MIT License; the full text is in src/ggml/LICENSE.
+
+src/zlm_arrow_abi.h
+  The Arrow C data interface and C stream interface definitions, from
+  the Apache Arrow specification (https://arrow.apache.org/).
+  Copyright The Apache Software Foundation.
+  Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0).

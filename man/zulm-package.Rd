@@ -28,6 +28,7 @@ Authors:
 Other contributors:
 \itemize{
   \item The ggml authors (Bundled 'ggml' library; see inst/COPYRIGHTS) [copyright holder]
+  \item The Apache Software Foundation (Arrow C data interface definitions; see inst/COPYRIGHTS) [copyright holder]
 }
 
 }

@@ -96,10 +96,11 @@ zlm_check_unit <- function(x, what) {
 #'   at an update.
 #' @param tr A trainer.
 #' @param data A named list of arrays for the graph's inputs, as for
-#'   [zl_forward()].
+#'   [zl_forward()], or an iterator from [zl_arrow_batches()].
 #' @param lr The learning rate of this step; `NULL` for the optimiser's.
 #' @param name A parameter's name.
-#' @return `zl_trainer()` returns a trainer; `zl_step()` the loss, a number;
+#' @return `zl_trainer()` returns a trainer; `zl_step()` the loss, a number
+#'   (`NULL` when `data` is an iterator whose stream has ended);
 #'   `zl_grad()` an array of the parameter's dimensions; `zl_reset()` the
 #'   trainer, invisibly.
 #' @export
@@ -178,7 +179,9 @@ zl_step <- function(tr, data, lr = NULL) {
   } else {
     zlm_check_lr(lr)
   }
-  zlm_write_inputs(tr$graph, data)
+  if (!zlm_write_inputs(tr$graph, data)) {
+    return(NULL)
+  }
   loss <- zlm_call("zlm_trainer_step", tr$ptr, as.double(lr))
   rl <- tr$graph$outputs$rowloss[[match(tr$graph$loss, tr$graph$outputs$names)]]
   if (!is.null(rl)) {

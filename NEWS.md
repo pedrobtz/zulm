@@ -114,3 +114,10 @@
   agrees with the plain form within f32 rounding, gives the same bits at
   any thread count, and attends over long contexts in memory linear in
   their length.
+
+* Arrow streams: `zl_arrow_batches()` reads record batches from
+  'DuckDB', Parquet or 'arrow' through 'nanoarrow' into batches of
+  exactly `rows` rows, with missing values as errors or masks and the
+  last batch dropped or padded; `zl_step()` and `zl_forward()` take the
+  iterator as `data`, and `zl_next()` returns a batch as R arrays.
+  `zl_int()` marks integer columns in its `map`.

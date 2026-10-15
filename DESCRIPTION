@@ -4,7 +4,9 @@ Version: 0.0.0.9000
 Authors@R: c(
     person("Pedro", "Baltazar", , "pedrobtz@gmail.com", role = c("aut", "cre", "cph")),
     person("The ggml authors", role = "cph",
-           comment = "Bundled 'ggml' library; see inst/COPYRIGHTS")
+           comment = "Bundled 'ggml' library; see inst/COPYRIGHTS"),
+    person("The Apache Software Foundation", role = "cph",
+           comment = "Arrow C data interface definitions; see inst/COPYRIGHTS")
   )
 Description: Builds computation graphs of tensors in R, runs them on the
     CPU, differentiates them and trains their parameters, through the

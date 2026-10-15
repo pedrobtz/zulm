@@ -31,3 +31,6 @@ jobs:
          {"os": "windows-latest", "r": "release"},
          {"os": "ubuntu-latest", "r": "release"},
          {"os": "ubuntu-latest", "r": "oldrel-1"}]
+      # CRAN's NOSUGGESTS flavour, in the full profile: the package must
+      # degrade without nanoarrow, testthat and withr (design §11).
+      nosuggests: true
