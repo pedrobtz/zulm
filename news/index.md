@@ -233,3 +233,10 @@
   returns a batch as R arrays.
   [`zl_int()`](https://pedrobtz.github.io/zulm/reference/zl_graph.md)
   marks integer columns in its `map`.
+
+- The C table: `inst/include/zulm.h` declares `zulm_api`, registered as
+  `zulm_api_v1`, for packages with `LinkingTo: zulm`. From C they run
+  graphs built in R, write inputs, read outputs, read and write
+  parameters and state tensors, draw from named streams under the
+  session key, and fill inputs from an Arrow iterator. Failures are
+  return codes with a message, never R errors.

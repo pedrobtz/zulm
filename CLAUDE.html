@@ -43,7 +43,7 @@
 </div>
 <div class="section level2">
 <h2 id="current-state">Current state<a class="anchor" aria-label="anchor" href="#current-state"></a></h2>
-<p>Verified 2026-10-15: Stage 11 of the roadmap. ggml v0.26.0’s CPU subset is vendored and builds as CPU-dispatched variants (Stage 1). Stores and GGUF (Stage 2), graphs and operations (Stage 3), training (Stage 4), zurand draws with fixed-order loss sums (Stage 5), modules and PyTorch fixtures (Stage 6), the thread pool (Stage 7), safetensors and f16 and bf16 weights (Stage 8), state tensors and the graph cache (Stage 9), flash attention (Stage 10), and Arrow batches (Stage 11) exist; the C table comes in Stage 12. Patches P1, P2, P7, P8, P9 and P10 are vendored; none has an upstream pull request yet (design §9.3).</p>
+<p>Verified 2026-10-15: Stage 12 of the roadmap. ggml v0.26.0’s CPU subset is vendored and builds as CPU-dispatched variants (Stage 1). Stores and GGUF (Stage 2), graphs and operations (Stage 3), training (Stage 4), zurand draws with fixed-order loss sums (Stage 5), modules and PyTorch fixtures (Stage 6), the thread pool (Stage 7), safetensors and f16 and bf16 weights (Stage 8), state tensors and the graph cache (Stage 9), flash attention (Stage 10), Arrow batches (Stage 11) and the C table <code>zulm_api_v1</code> (Stage 12) exist; fuzzing, benchmarks and documentation come in Stage 13. Patches P1, P2, P7, P8, P9 and P10 are vendored; none has an upstream pull request yet (design §9.3).</p>
 </div>
 <div class="section level2">
 <h2 id="stage-tracking">Stage tracking<a class="anchor" aria-label="anchor" href="#stage-tracking"></a></h2>
@@ -95,7 +95,7 @@
 <code>src/</code> holds the C glue (prefix <code>zlm_</code>), a small C++ shim that turns ggml assertions into R errors (design §13.2), and <code>src/ggml/</code>, the vendored upstream tree, built once per ISA variant (design §13.1).</li>
 <li>Variants: <code>src/zlm_v/&lt;set&gt;/</code> holds generated wrapper translation units (one per ggml source) that include <code>zlm_variant_begin.h</code>, the source and <code>zlm_variant_end.h</code>; <code>configure</code> appends <code>src/make/&lt;arch&gt;.mk</code> to <code>src/Makevars.in</code>; <code>src/install.libs.R</code> installs every <code>zulm_&lt;variant&gt;</code> shared object. <code>zulm.so</code> itself is only the CPU probe; <code>R/load.R</code> loads the variant and calls its routines through <code>zlm_call()</code>.</li>
 <li>
-<code>inst/include/zulm.h</code> is the public C table, <code>zulm_api_v1</code>.</li>
+<code>inst/include/zulm.h</code> is the public C table, <code>zulm_api_v1</code> (<code>src/zlm_api.c</code>). Each variant holds a copy; <code>R/load.R</code> registers the loaded variant’s. Its members return codes and never raise R errors. The fixture consumer <code>tests/testthat/zulmclient</code> is built against it.</li>
 </ul></div>
 <div class="section level2">
 <h2 id="invariants-that-are-easy-to-break">Invariants that are easy to break<a class="anchor" aria-label="anchor" href="#invariants-that-are-easy-to-break"></a></h2>
