@@ -10,12 +10,21 @@
 #
 # A finding is a crash, a sanitizer report, a ggml assertion or an R error
 # without a zulm class. tools/run-fuzz runs the same targets locally.
+#
+# Quick on pull requests and pushes: a minute a target, from the cached
+# corpus. Full before submission (CLAUDE.md): dispatched with full: true, or
+# a pull request labelled full-ci, an hour a target.
 on:
+  push:
+    branches: [main]
   pull_request:
-  schedule:
-    # an hour a target nightly; the corpus cache joins it to the PR runs
-    - cron: "17 3 * * *"
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
+    inputs:
+      full:
+        description: An hour a target, as before submission
+        type: boolean
+        default: false
 
 name: fuzz
 
@@ -54,5 +63,5 @@ jobs:
         -DGGML_SCHED_MAX_SPLIT_INPUTS=4 -pthread
       seed-corpus: tools/fuzz/seeds/${{ matrix.target.name }}
       libfuzzer-args: -rss_limit_mb=4096 -max_len=4096
-      max-total-time: ${{ github.event_name == 'schedule' && 3600 || 600 }}
+      max-total-time: ${{ (inputs.full || contains(github.event.pull_request.labels.*.name, 'full-ci')) && 3600 || 60 }}
       timeout-minutes: 90

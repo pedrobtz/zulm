@@ -273,6 +273,12 @@ static SEXP zlm_fuzz_stream(SEXP raw) {
 
 /* ---- embedding ------------------------------------------------------- */
 
+/* R's heap outlives every input by design, so LeakSanitizer's report at
+   exit is about R, not zulm: off, as -detect_leaks=0 is while fuzzing. */
+const char *__asan_default_options(void) {
+  return "detect_leaks=0";
+}
+
 static SEXP zlm_fuzz_abort(void) {
   abort();
 }

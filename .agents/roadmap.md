@@ -686,8 +686,8 @@ documented for users and for the two consumers.
 
 **Deviations (2026-10-15).** `zufuzz` is a skeleton, so the fuzz
 targets run under r-actions' libFuzzer harness with R embedded
-(`tools/fuzz/`, the `fuzz` workflow): ten minutes a target on a pull
-request, an hour nightly. They drive zulm through its R functions, so
+(`tools/fuzz/`, the `fuzz` workflow): a minute a target on a pull
+request or a push, an hour in the full run before submission. They drive zulm through its R functions, so
 the header target fuzzes zulm's C readers (GGUF and the safetensors
 header length) while the safetensors header's checks, which are R and
 `zujson`, keep Stage 8's mutation test. The first runs found fifteen

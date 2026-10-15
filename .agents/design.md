@@ -2043,8 +2043,8 @@ from `zl_step()`).
   sequences and shapes.
 - **Fuzzing (Stage 13).** `zufuzz` is not built yet, so the targets run
   under r-actions' libFuzzer harness with ASan and UBSan, in the `fuzz`
-  workflow: ten minutes each on a pull request, an hour nightly, from a
-  cached corpus. `tools/fuzz/fuzz.c` embeds R and drives zulm through
+  workflow: a minute each on a pull request or a push, an hour in the
+  full run before submission, from a cached corpus. `tools/fuzz/fuzz.c` embeds R and drives zulm through
   its R functions, with the glue and the baseline variant's ggml
   compiled in and instrumented, so R's validation is fuzzed with the C:
   graph construction from random operation sequences and shapes,
