@@ -885,6 +885,14 @@ fill, so one `c(n_kv, n_q, 1, B)` mask serves all heads.
   and the R call that created it, any node that needs a gradient and
   whose operation lacks a backward pass in the vendored ggml (including
   patches). ggml would otherwise abort in `ggml_compute_backward`.
+  The same walk follows which nodes may receive a gradient outside the
+  canonical layout, as a permutation's backward hands on, and whether
+  its rows stay dense; it refuses a node whose backward or kernels
+  assert against that (a copy, `scale`, `mean`, `neg`, a broadcast
+  operand's reduction, a binary or unary kernel on sparse rows, or a
+  second gradient summed into a sparse first one). Found by fuzzing
+  (Stage 13); the attention blocks of §1.2 permute reshapes, whose
+  backward makes the gradient contiguous, and are not affected.
 
 ### 6.3 Autograd and compositions
 
@@ -1478,7 +1486,7 @@ the byte buffer. Duplicate keys are disallowed.
 - **Checks.** `N` within the file and below a cap, offsets in range,
   ordered, non-overlapping and covering the buffer, known dtypes, and
   element count × size equal to `end - begin`; failures are
-  `zulm_file_error`, and a `zufuzz` target covers the header. A header
+  `zulm_file_error`, and a mutation test covers the header. A header
   that `zujson` rejects is `zulm_file_error` with `zujson`'s message.
 - **Types.** F32, F16 and BF16 to f32; F64 to f32 with
   `zulm_range_warning` when needed; I32 and I64 to index arrays;
@@ -1838,6 +1846,16 @@ now.
 | P8 | no `static_assert` macro under C23 | warns (below) | none: vendored |
 | P9 | GGUF tensor type checked before it is a `ggml_type` | UB (below) | none: vendored |
 | P10 | type-table functions called through their own types | UB (below) | none: vendored |
+| P11 | GGUF key type checked before it is a `gguf_type` | UB (below) | none: vendored |
+
+**Status, Stage 13 (2026-10-15).** The fuzz targets (§11) found two
+more. P11: `gguf_init_from_reader()` read a key-value pair's type into
+a `gguf_type` before rejecting unknown ones, and started the variable
+at `gguf_type(-1)`, both invalid enum loads in C++; it is vendored like
+P9. P7 now makes a gradient dense before its norm and the step also
+when the gradient's first dimension is 1 with a stride, which
+`ggml_is_contiguous()` passes and the `sqr` and `mul` kernels assert
+against.
 
 **Status, Stage 4 (2026-10-14).** P1, P2 and P7 are vendored
 (`tools/patches/`) beside P8, P9 and P10, each pinned by a regression
@@ -2007,7 +2025,7 @@ from `zl_step()`).
 - **safetensors.** Round trips at f32, f16 and bf16; files written by
   the Python `safetensors` package; a real Hub header with no data
   (Toto 2.0 4M's 48 tensors, a few kilobytes) parsed and validated; a
-  `zufuzz` target for headers.
+  mutation test of headers, and a fuzz target for the C readers.
 - **Spectra (0.2).** `zl_spectrum(method = "dft")` against `zufft` and
   against `stats::fft()`; its gradient by finite differences.
 - **Regression tests for P1, P2 and P7.** With the patches vendored,
@@ -2021,8 +2039,23 @@ from `zl_step()`).
 - **Hostile input.** Every R function with wrong shapes, types, `NA`,
   zero-length dimensions, more than four dimensions, freed objects and
   objects after `saveRDS()`; none may reach a ggml assertion. A
-  `zufuzz` target drives graph construction with random operation
+  fuzz target drives graph construction with random operation
   sequences and shapes.
+- **Fuzzing (Stage 13).** `zufuzz` is not built yet, so the targets run
+  under r-actions' libFuzzer harness with ASan and UBSan, in the `fuzz`
+  workflow: ten minutes each on a pull request, an hour nightly, from a
+  cached corpus. `tools/fuzz/fuzz.c` embeds R and drives zulm through
+  its R functions, with the glue and the baseline variant's ggml
+  compiled in and instrumented, so R's validation is fuzzed with the C:
+  graph construction from random operation sequences and shapes,
+  forward and training; arbitrary bytes as GGUF and safetensors files;
+  the Arrow type map on streams built from the input. A finding is a
+  crash, a sanitizer report, a ggml assertion or an R error without a
+  zulm class. The first runs found thirteen; each is fixed and pinned
+  in `test-fuzz-findings.R` (or, for P11, `test-persist.R`). Most were
+  gradients a permutation leaves outside the canonical layout, which
+  ggml's backward and kernels assert against in places the pre-check
+  of §6.2 now follows.
 - **GGUF.** Round trips at f32, f16 and bf16; files written by zulm
   read by upstream's `gguf` Python package in CI.
 - **Threads and fork.** Interrupt during a long graph; a forked child
@@ -2541,7 +2574,7 @@ Stages 5 and 9" reads zulm's Stages 6 and 12.
    PyTorch fixtures, loaded from GGUF, reproduce PyTorch's outputs and
    gradients within tolerance; a step with `clip_norm` scales
    gradients by the factor computed in R.
-4. No test in the hostile-input suite and no `zufuzz` run reaches a
+4. No test in the hostile-input suite and no fuzz run reaches a
    ggml assertion.
 5. `tools/vendor-ggml` reproduces `src/ggml/` byte for byte from the tag
    and the patches; each patch names its upstream pull request.

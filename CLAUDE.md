@@ -32,7 +32,7 @@ fixtures (Stage 6), the thread pool (Stage 7), safetensors and f16 and
 bf16 weights (Stage 8), state tensors and the graph cache (Stage 9),
 flash attention (Stage 10), Arrow batches (Stage 11) and the C table
 `zulm_api_v1` (Stage 12) exist; fuzzing, benchmarks and documentation
-come in Stage 13. Patches P1, P2, P7, P8, P9 and P10 are vendored;
+come in Stage 13. Patches P1, P2, P7, P8, P9, P10 and P11 are vendored;
 none has an upstream pull request yet (design §9.3).
 
 ## Stage tracking
