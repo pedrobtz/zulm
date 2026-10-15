@@ -9,6 +9,7 @@
 .zlm <- new.env(parent = emptyenv())
 
 .onLoad <- function(libname, pkgname) {
+  zlm_torture_setup(Sys.getenv("ZULM_GCTORTURE"))
   zlm_load_variant(getOption("zulm.variant"))
   .zlm$zurand_version <- zlm_call("zlm_zurand_init")
   zlm_check_zurand(.zlm$zurand_version)
@@ -128,6 +129,9 @@ zlm_call <- function(name, ...) {
     )
   }
   on.exit(zlm_flush_log())
+  if (!is.null(.zlm$torture)) {
+    return(zlm_tortured_call(r, name, ...))
+  }
   zlm_dot_call(r, ...)
 }
 
@@ -135,7 +139,56 @@ zlm_call <- function(name, ...) {
 # per graph: ggml's builders log nothing but the assertions that zulm turns
 # into errors, so the log is left for the next zlm_call() to flush.
 zlm_call_quiet <- function(name, ...) {
+  if (!is.null(.zlm$torture)) {
+    return(zlm_tortured_call(.zlm$routines[[name]], name, ...))
+  }
   zlm_dot_call(.zlm$routines[[name]], ...)
+}
+
+# gctorture where it can find something (the gctorture CI job). A missing
+# PROTECT bites only while C runs, so R's collector is forced only inside
+# zulm's .Call()s, and only for the first calls of each routine with each
+# combination of argument types: repeats in loops add time, not paths.
+# An object C should have kept alive between calls is still caught, as the
+# next tortured call collects it before C reads it.
+#
+#   ZULM_GCTORTURE=<step>[,<limit>]
+#
+# collects every `step` allocations inside the first `limit` calls of each
+# (routine, argument types); a limit of 0 tortures every call. A step of 0
+# tortures nothing and only records the calls, which tools/smoke-tests.R
+# reads. Unset, as on CRAN, nothing is tortured or recorded.
+zlm_torture_setup <- function(spec) {
+  .zlm$torture <- NULL
+  if (!nzchar(spec)) {
+    return(invisible(NULL))
+  }
+  v <- suppressWarnings(as.integer(strsplit(spec, ",", fixed = TRUE)[[1L]]))
+  if (length(v) < 1L || length(v) > 2L || anyNA(v) || v[[1L]] < 0L || (length(v) == 2L && v[[2L]] < 0L)) {
+    zlm_abort("ZULM_GCTORTURE must be <step> or <step>,<limit> with step and limit >= 0.", "zulm_invalid_argument")
+  }
+  .zlm$torture <- list(
+    step = v[[1L]],
+    limit = if (length(v) == 2L) v[[2L]] else 0L,
+    seen = new.env(parent = emptyenv())
+  )
+  invisible(NULL)
+}
+
+zlm_tortured_call <- function(r, name, ...) {
+  t <- .zlm$torture
+  if (t$limit > 0L || t$step == 0L) {
+    key <- paste(c(name, vapply(list(...), typeof, "")), collapse = " ")
+    n <- t$seen[[key]]
+    n <- if (is.null(n)) 0L else n
+    t$seen[[key]] <- n + 1L
+    if (t$step == 0L || (t$limit > 0L && n >= t$limit)) {
+      return(zlm_dot_call(r, ...))
+    }
+  }
+  old <- gctorture2(t$step)
+  on.exit(gctorture2(old))
+  zlm_dot_call(r, ...)
 }
 
 # The routines belong to the variant shared object .onLoad chooses, so
