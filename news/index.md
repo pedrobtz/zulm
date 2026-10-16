@@ -1,9 +1,13 @@
 # Changelog
 
-## zulm 0.0.0.9000
+## zulm 0.1.0
 
-- First development version: the package skeleton and its family
-  conventions. The R interface follows in later stages.
+- Initial CRAN release: computation graphs of tensors, built in R and
+  run on the CPU through a bundled ‘ggml’, with automatic
+  differentiation, the AdamW and SGD optimisers, pretrained weights from
+  GGUF and safetensors files, state tensors for decoding, training
+  batches from Arrow streams, and a versioned C interface for other
+  packages.
 
 - Bundles the CPU subset of ‘ggml’ v0.26.0, built once per
   instruction-set level (`baseline`, `sse42` and `avx2` on x86-64,

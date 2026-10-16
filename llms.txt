@@ -111,6 +111,13 @@ and the shipped ones.
 
 ## Installation
 
+Install the released version of zulm from CRAN:
+
+``` r
+
+install.packages("zulm")
+```
+
 You can install the development version of zulm from
 [GitHub](https://github.com/pedrobtz/zulm) with:
 
