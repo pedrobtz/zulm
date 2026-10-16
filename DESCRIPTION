@@ -1,10 +1,16 @@
 Package: zulm
 Title: Tensor Graphs, Training and Inference on 'ggml'
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: c(
     person("Pedro", "Baltazar", , "pedrobtz@gmail.com", role = c("aut", "cre", "cph")),
     person("The ggml authors", role = "cph",
            comment = "Bundled 'ggml' library; see inst/COPYRIGHTS"),
+    person("Mozilla Foundation", role = "cph",
+           comment = "'llamafile' matrix kernels in the bundled 'ggml'; see inst/COPYRIGHTS"),
+    person("Jeffrey", "Quesnelle", role = "cph",
+           comment = "'YaRN' rotary scaling in the bundled 'ggml'; see inst/COPYRIGHTS"),
+    person("Bowen", "Peng", role = "cph",
+           comment = "'YaRN' rotary scaling in the bundled 'ggml'; see inst/COPYRIGHTS"),
     person("The Apache Software Foundation", role = "cph",
            comment = "Arrow C data interface definitions; see inst/COPYRIGHTS")
   )
@@ -13,8 +19,10 @@ Description: Builds computation graphs of tensors in R, runs them on the
     'ggml' tensor library (<https://github.com/ggml-org/ggml>) bundled in
     its CPU subset. Graphs are built once per input shape and run many
     times; the same operations train small and medium neural networks
-    with the AdamW and SGD optimisers and run pretrained transformer
-    checkpoints read from 'GGUF' or 'safetensors' files. Results
+    with the AdamW (Loshchilov and Hutter (2019)
+    <doi:10.48550/arXiv.1711.05101>) and SGD optimisers and run
+    pretrained transformer checkpoints read from 'GGUF' or 'safetensors'
+    files. Results
     reproduce bit for bit at a fixed seed whatever the thread count.
     A versioned C interface lets other packages build models on top.
 License: MIT + file LICENSE

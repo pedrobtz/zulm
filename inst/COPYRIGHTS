@@ -7,6 +7,14 @@ src/ggml/
   Copyright (c) 2023-2026 The ggml authors.
   MIT License; the full text is in src/ggml/LICENSE.
 
+  Two of its files carry notices of their own, also under the MIT
+  License:
+  src/ggml/src/ggml-cpu/llamafile/sgemm.cpp, the 'llamafile' matrix
+    kernels: Copyright 2024 Mozilla Foundation.
+  src/ggml/src/ggml-cpu/ops.cpp, the 'YaRN' rotary scaling
+    (rope_yarn() and its helpers): Copyright (c) 2023 Jeffrey Quesnelle
+    and Bowen Peng.
+
 src/zlm_arrow_abi.h
   The Arrow C data interface and C stream interface definitions, from
   the Apache Arrow specification (https://arrow.apache.org/).
