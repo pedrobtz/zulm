@@ -12,7 +12,7 @@ is a substrate, not a framework: tensors, explicit graphs, ggml's
 autograd and optimisers, GGUF and safetensors for weights, a few
 modules, and a versioned C table for packages that build models on top.
 Its two consumers are `zuflow`, which trains and samples an
-event-sequence generator, and `zukzeit`, which runs pretrained
+event-sequence generator, and `zutsfm`, which runs pretrained
 time-series foundation models. Hard dependencies are the family's
 `zurand` (random numbers, `Imports` and `LinkingTo`) and `zujson`
 (safetensors headers); nothing else. No GPU, no OpenMP, no system
@@ -64,7 +64,7 @@ release. Set `Version: 0.1.0` and the matching `NEWS.md` heading when the
 package enters `Pre-flight`. Bump to `0.1.0.9000` only after CRAN accepts it.
 
 Until the first release the R API may change freely. The C table in
-`inst/include/zulm.h` (Stage 12) is different: `zuflow` and `zukzeit`
+`inst/include/zulm.h` (Stage 12) is different: `zuflow` and `zutsfm`
 build against it, so it follows the append-only rules of design §8 from
 the day it exists. zulm needs `zurand` on CRAN before it can be submitted;
 until then `Remotes: pedrobtz/zurand` stays in `DESCRIPTION`.

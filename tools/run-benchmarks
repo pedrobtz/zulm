@@ -6,7 +6,7 @@
 #   Rscript tools/run-benchmarks [label]
 #
 # Each row is the median of repeated runs. `torch` rows run when the R
-# torch package and LibTorch are installed; the Toto row when zukzeit's
+# torch package and LibTorch are installed; the Toto row when zutsfm's
 # zulm-runtime branch and hfhub are (it downloads the 16 MB checkpoint).
 args <- commandArgs(TRUE)
 label <- if (length(args) >= 1L) args[[1L]] else "default"
@@ -175,15 +175,15 @@ if (requireNamespace("torch", quietly = TRUE) && torch::torch_is_installed()) {
   }
 }
 
-if (requireNamespace("zukzeit", quietly = TRUE) && requireNamespace("hfhub", quietly = TRUE) &&
-  exists("toto_constructor", asNamespace("zukzeit"))) {
+if (requireNamespace("zutsfm", quietly = TRUE) && requireNamespace("hfhub", quietly = TRUE) &&
+  exists("toto_constructor", asNamespace("zutsfm"))) {
   rev <- "8306a9801cf98c0f5ffe4b2dcc8f496e616d84d9"
   paths <- vapply(c("config.json", "model.safetensors"), function(f) {
     hfhub::hub_download("Datadog/Toto-2.0-4m", f, revision = rev)
   }, character(1))
   config <- jsonlite::fromJSON(paths[["config.json"]])
   config$device <- "cpu"
-  toto <- zukzeit:::toto_constructor(config, zl_safetensors_read(paths[["model.safetensors"]]))
+  toto <- zutsfm:::toto_constructor(config, zl_safetensors_read(paths[["model.safetensors"]]))
   ctx <- list(cumsum(stats::rnorm(4096)))
   zl_threads(1L)
   s <- per_call(function() toto$predict_batch_fn(ctx, 32L, seq(0.1, 0.9, by = 0.1), device = "cpu"), n = 3L)

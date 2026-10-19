@@ -44,6 +44,6 @@ and have no single reference.
 ## Reverse dependencies
 
 There are no reverse dependencies on CRAN. The `zulm-runtime` branch of
-zukzeit (https://github.com/pedrobtz/zukzeit/tree/zulm-runtime) runs its
+zutsfm (https://github.com/pedrobtz/zutsfm/tree/zulm-runtime) runs its
 Toto 2.0 4M parity fixtures with zulm as the tensor runtime, against
 zulm's development version, on every CI leg.

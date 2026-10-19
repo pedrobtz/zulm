@@ -2,7 +2,7 @@ Package: zulmclient
 Version: 0.0.1
 Title: Test Fixture for the 'zulm' C Table
 Description: Built by tests/testthat/test-c-table.R to drive 'zulm' from C
-    the way 'zuflow' and 'zukzeit' do. A real package declares
+    the way 'zuflow' and 'zutsfm' do. A real package declares
     'LinkingTo: zulm' and 'Imports: zulm'; this fixture gets the header
     path from the test instead, so it also builds under devtools::test().
 License: MIT

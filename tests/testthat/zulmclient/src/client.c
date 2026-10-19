@@ -1,5 +1,5 @@
 /* A downstream package driving zulm through its C table, as zuflow's
- * samplers and zukzeit's decode loop would. */
+ * samplers and zutsfm's decode loop would. */
 #include <string.h>
 #include <R.h>
 #include <Rinternals.h>

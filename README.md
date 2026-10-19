@@ -23,7 +23,7 @@ Two use cases size the package:
 - **Inference.** Pretrained transformer checkpoints of up to a few
   hundred million parameters, loaded from GGUF or safetensors and run
   without Python, LibTorch or a GPU toolchain. The first consumer is
-  [zukzeit](https://github.com/pedrobtz/zukzeit), which runs
+  [zutsfm](https://github.com/pedrobtz/zutsfm), which runs
   time-series foundation models.
 
 zulm is under development toward its first CRAN release; the

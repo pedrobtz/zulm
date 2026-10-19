@@ -1,5 +1,5 @@
 # The C table (design §8, inst/include/zulm.h), driven the way zuflow and
-# zukzeit drive it: a fixture package, tests/testthat/zulmclient, is built
+# zutsfm drive it: a fixture package, tests/testthat/zulmclient, is built
 # against the header and calls the table from C. Every value it returns
 # must equal what the R functions give.
 #
