@@ -5,7 +5,7 @@ Target: v0.1.0, the first CRAN release.
 Tracking: [v0.1.0 (#1)](https://github.com/pedrobtz/zulm/issues/1), with one
 sub-issue per stage; [CRAN-submission (#17)](https://github.com/pedrobtz/zulm/issues/17).
 
-v0.1.0 carries everything zuflow 0.1.0 and zukzeit 0.1.0 need (design D27):
+v0.1.0 carries everything zuflow 0.1.0 and zutsfm 0.1.0 need (design D27):
 the training substrate, the forward-only operations and weight formats of
 pretrained inference, state tensors, and Arrow batches. Only the `zuexact`
 lookup, the FFT and sorting wait for 0.2.
@@ -31,7 +31,7 @@ and pkgdown workflows, and the design. Nothing of the design is built.
 | 9 | [State tensors and the graph cache](#stage-9--state-tensors-and-the-graph-cache) | [#11](https://github.com/pedrobtz/zulm/issues/11) | [#30](https://github.com/pedrobtz/zulm/pull/30) | 2026-10-14 |
 | 10 | [Flash attention](#stage-10--flash-attention) | [#12](https://github.com/pedrobtz/zulm/issues/12) | [#31](https://github.com/pedrobtz/zulm/pull/31) | 2026-10-14 |
 | 11 | [Arrow batches](#stage-11--arrow-batches) | [#13](https://github.com/pedrobtz/zulm/issues/13) | [#32](https://github.com/pedrobtz/zulm/pull/32) | 2026-10-15 |
-| 12 | [The C table and the zukzeit proof](#stage-12--the-c-table-and-the-zukzeit-proof) | [#14](https://github.com/pedrobtz/zulm/issues/14) | [#33](https://github.com/pedrobtz/zulm/pull/33), [#34](https://github.com/pedrobtz/zulm/pull/34) | 2026-10-15 |
+| 12 | [The C table and the zutsfm proof](#stage-12--the-c-table-and-the-zutsfm-proof) | [#14](https://github.com/pedrobtz/zulm/issues/14) | [#33](https://github.com/pedrobtz/zulm/pull/33), [#34](https://github.com/pedrobtz/zulm/pull/34) | 2026-10-15 |
 | 13 | [Fuzzing, benchmarks and documentation](#stage-13--fuzzing-benchmarks-and-documentation) | [#15](https://github.com/pedrobtz/zulm/issues/15) | [#34](https://github.com/pedrobtz/zulm/pull/34) | 2026-10-15 |
 | 14 | [v0.1.0 readiness](#stage-14--v010-readiness) | [#16](https://github.com/pedrobtz/zulm/issues/16) | | |
 
@@ -600,14 +600,14 @@ Dictionary codes may be unsigned, as DuckDB's are. The R CMD check
 caller now runs r-actions' `nosuggests` leg, and the acceptance workflow
 a job without nanoarrow.
 
-## Stage 12 — The C table and the zukzeit proof
+## Stage 12 — The C table and the zutsfm proof
 
 **Issue.** [#14](https://github.com/pedrobtz/zulm/issues/14), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zulm/issues/1).
 
 **Goal.** Other packages drive zulm from C through a versioned table of
 opaque handles, and both consumers are shown to build on it: a fixture
-consumer for zuflow's pattern, and zukzeit's Toto 2.0 4M running on
+consumer for zuflow's pattern, and zutsfm's Toto 2.0 4M running on
 zulm with its parity fixtures green.
 
 **Work.**
@@ -621,16 +621,16 @@ zulm with its parity fixtures green.
   averaging through `param_read_f32` and `param_write_f32`; a state
   write; `batch_fill`; `struct_size` and version checks; a standalone
   compile of the header as C99 and C++17.
-- A branch of `pedrobtz/zukzeit` in which the Toto 2.0 4M port's tensor
-  runtime is zulm, run in zukzeit's CI against zulm's `main`; the
+- A branch of `pedrobtz/zutsfm` in which the Toto 2.0 4M port's tensor
+  runtime is zulm, run in zutsfm's CI against zulm's `main`; the
   branch link recorded in design §15 and in `cran-comments.md` as a
   reverse-dependency check.
 
 **Exit criteria.**
 - The fixture consumer passes under r-actions on every leg (skipped on
   CRAN as the family's C-table tests are).
-- zukzeit's committed parity fixtures for Toto 2.0 4M pass with zulm as
-  the runtime, within zukzeit's documented tolerance, on CPU, on every
+- zutsfm's committed parity fixtures for Toto 2.0 4M pass with zulm as
+  the runtime, within zutsfm's documented tolerance, on CPU, on every
   CI leg (design §15 criterion 10).
 - A consumer compiled against a shorter table version is refused with a
   clear message.
@@ -647,7 +647,7 @@ older, shorter header keeps working. `zulm.h` names the return codes
 `ZULM_EFAILED` with its message. `ggml_version()` lists every vendored
 patch, as `"0.26.0+p1,p2,p7,p8,p9,p10"`. The table has no output-shape
 member: a consumer knows the shapes of the graph it built in R. The
-zukzeit branch, `zulm-runtime`, drives zulm from R, as §7.9 expects of a
+zutsfm branch, `zulm-runtime`, drives zulm from R, as §7.9 expects of a
 first port; it uses nothing from the table.
 
 ## Stage 13 — Fuzzing, benchmarks and documentation
@@ -672,7 +672,7 @@ documented for users and for the two consumers.
   build section as zufft's; `NEWS.md` under the development heading.
 - `cran-comments.md` drafted: the r-actions legs as test environments,
   the `abort` symbol if it remains, the reverse-dependency check on the
-  zukzeit branch.
+  zutsfm branch.
 
 **Exit criteria.**
 - Every fuzz target runs clean under ASan and UBSan for the configured
@@ -735,7 +735,7 @@ the "pretrained block".
   zurand#64 land, with a test that the bits are unchanged (§7.2).
 - Saving and restoring optimiser state for exact resumption (§6.6).
 - GPU backends as opt-in `configure` switches, Vulkan then Metal (§17
-  question 5); until then zukzeit's `device` is the CPU.
+  question 5); until then zutsfm's `device` is the CPU.
 - Quantised weights, mixed-precision training, flash attention in
   training graphs, custom operations through the table, special
   functions through `zuspecial` (§2, Later).
@@ -751,8 +751,8 @@ the "pretrained block".
   needed, and whether the native hook can be offered on Windows.
 - **Stage 10** decides open question 16, whether flash attention is
   thread-invariant, and so whether it is on by default.
-- **Stage 12** depends on zukzeit's maintainer accepting a branch that
-  swaps Toto's runtime; the order of the other two ports is zukzeit's
+- **Stage 12** depends on zutsfm's maintainer accepting a branch that
+  swaps Toto's runtime; the order of the other two ports is zutsfm's
   roadmap decision (design §18).
 - **Stage 14** cannot close before zurand and zujson are on CRAN;
   zujson is, zurand's submission is prepared.

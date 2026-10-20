@@ -16,7 +16,7 @@
   v0.1.0. **2026-10-13, on adoption as the package design:** the
   package is `zulm` and the R prefix `zl_` (D31, D32); a second driving
   use case joins the first, running pretrained time-series foundation
-  models for `zukzeit`, which today runs them on `torch` (§1.2, D33);
+  models for `zutsfm`, which today runs them on `torch` (§1.2, D33);
   the inference work is designed (§6.9, §7.4); the forward-only operations that inference
   needs, and both rotary conventions, enter v0.1.0 (§5.3, D37, D38); a
   key-value cache is designed as state tensors (§6.9, D34); f16 and
@@ -24,7 +24,7 @@
   (§6.9, D35); the safetensors header is parsed by the family's
   `zujson`, so yyjson is not vendored (§7.4, D36); the C table gains the
   members both consumers asked for (§8); and §7.9 draws the boundary
-  with zukzeit as §7.8 does with zuflow. **2026-10-14:** random numbers
+  with zutsfm as §7.8 does with zuflow. **2026-10-14:** random numbers
   come from `zurand`'s C table, the family generator RFC 0031 looked
   for under another name and could not find; Random123 is no longer
   vendored and Box–Muller is dropped (§7.2, D19, D20). The opt-in
@@ -34,7 +34,7 @@
   which R's own Makevars check would reject, for a pragma in the
   force-included header (§13.1, D41). The maintainer decided the
   prefix (`zl_`, D32) and the releases: zulm goes to CRAN once, at
-  0.1.0, with everything zuflow 0.1.0 and zukzeit 0.1.0 need, so the
+  0.1.0, with everything zuflow 0.1.0 and zutsfm 0.1.0 need, so the
   inference work and the Arrow iterator are in v0.1.0 and only
   `zuexact`, the FFT and sorting wait for 0.2 (§2, §14, D27);
   `zujson` is `Imports` (question 13).
@@ -48,10 +48,10 @@
   safetensors header (§7.4); suggests `nanoarrow` and, from 0.2,
   `zuexact` and `zufft` (§7).
   Consumers: `zuflow` (RFC 0032), a flow-matching generator for event
-  sequences, which trains and samples; and `zukzeit` (RFC 0002), an
+  sequences, which trains and samples; and `zutsfm` (RFC 0002), an
   inference engine for time-series foundation models, which runs
   pretrained checkpoints.
-- **Read for the 2026-10-13 revision:** `pedrobtz/zukzeit` at `main`
+- **Read for the 2026-10-13 revision:** `pedrobtz/zutsfm` at `main`
   (2026-09-23): `README.md`, `DESCRIPTION` (`Imports: torch,
   safetensors, hfhub`), `.agents/plan.md`, `roadmap.md`,
   `consumer-api.md`, `contract-v2.md`, `timesfm-feasibility.md`,
@@ -152,7 +152,7 @@ on the CPU, or run pretrained transformer checkpoints of up to a few
 hundred million parameters, without Python, LibTorch or a GPU
 toolchain, with results that reproduce bit for bit at a fixed seed;
 and family packages that build models: `zuflow`, which trains and
-samples (§1.1), and `zukzeit`, which runs checkpoints (§1.2).
+samples (§1.1), and `zutsfm`, which runs checkpoints (§1.2).
 
 The one-line statement that governs every decision below:
 
@@ -160,7 +160,7 @@ The one-line statement that governs every decision below:
 > R substrate for training and running models on the CPU.**
 
 Two use cases size the design, and v0.1.0 carries both in full (D27):
-zulm goes to CRAN first, and zuflow 0.1.0 and zukzeit 0.1.0 are built
+zulm goes to CRAN first, and zuflow 0.1.0 and zutsfm 0.1.0 are built
 on it, so neither may find a capability missing. The first use case,
 training, fixes the graph, autograd and optimiser surface. The second,
 inference of pretrained models, fixes the forward-only operations,
@@ -260,7 +260,7 @@ the encoder's latent held fixed (§6.4).
 
 ### 1.2 The second driving use case: running time-series foundation models
 
-`zukzeit` (RFC 0002) runs open time-series foundation models natively
+`zutsfm` (RFC 0002) runs open time-series foundation models natively
 in R and returns predictive quantiles. It ports each architecture to R
 `torch` by hand and certifies the port against pinned reference
 fixtures from the official PyTorch implementation; three checkpoints
@@ -273,11 +273,11 @@ have passed both its gates:
 | Toto 2.0 4M (`Datadog/Toto-2.0-4m`) | 4.1 M, 16 MB f32, 48 tensors | 4 blocks, width 256, feed-forward 688 gated (SwiGLU), 4 heads × 64, patch 32, context 4 096 (128 patches), 9 quantiles | unit scaling (every linear divided by `sqrt(fan_in)`, SiLU times 1.7668, residuals `(tau h + skip) / sqrt(1 + tau²)` with buffers); interleaved rotary positions on half of each head with an xPos decay of opposite sign on queries and keys; attention `scale = 1 / 64`; the fourth layer attends across variates, not time; a Welford scaler in float64 composed with `asinh`; one forward pass, no cache |
 
 Running these on zulm instead of `torch` is the inference case. It is
-worth doing for the same reasons as the training case: zukzeit's users
+worth doing for the same reasons as the training case: zutsfm's users
 today download LibTorch to run a 16 MB checkpoint, and its README
 records that its fixtures drift by a couple of float32 ulps between
 machines under the same pinned environment, where zulm promises bit
-identity per ISA variant (§6.5). The port stays zukzeit's (§7.9); what
+identity per ISA variant (§6.5). The port stays zutsfm's (§7.9); what
 zulm owes it is the operations, read from the three `torch` ports on
 2026-10-13 and matched against upstream ggml's operation list:
 
@@ -309,7 +309,7 @@ zulm owes it is the operations, read from the three `torch` ports on
 Every row maps to an existing upstream operation or to R code around
 the graph; nothing needs a ggml patch, and nothing in the transformer
 needs more than four dimensions. The parts that stay in R on doubles
-are exactly the parts that zukzeit's reference implementations run in
+are exactly the parts that zutsfm's reference implementations run in
 float64 or outside the network, so leaving them there is what keeps the
 parity fixtures meaningful (§6.9). Memory is not a constraint: TimesFM's
 parameters are 925 MB in f32, its score matrices at full context 16 MB
@@ -317,7 +317,7 @@ per sequence, and its key-value cache 105 MB per sequence (§6.9), all
 under the 4 GiB default of §6.6.
 
 TimesFM's attention block in zulm's API, to show the fit (the full port,
-with its decode loop, is zukzeit's):
+with its decode loop, is zutsfm's):
 
 ```r
 p   <- zl_params()                 # filled by zl_load_safetensors()
@@ -402,7 +402,7 @@ and no rotary positions.
 The list is longer than the one the review of 2026-10-10 left, which
 had cut v0.1.0 to the §1.1 model and the determinism contract. The
 maintainer's decision of 2026-10-14 (D27) is that zulm reaches CRAN
-once with everything zuflow 0.1.0 and zukzeit 0.1.0 need, rather than
+once with everything zuflow 0.1.0 and zutsfm 0.1.0 need, rather than
 in three releases that each consumer would have to wait for. The
 cost is in §14 and the roadmap: fifteen stages instead of nine.
 
@@ -445,7 +445,7 @@ consumer's first release, so they wait):
 - Samplers, optimal-transport coupling, atom smoothing and evaluation
   metrics: zuflow's (§7.8). Checkpoint catalogues, Hub downloads,
   architecture ports, forecast objects and framework adapters:
-  zukzeit's (§7.9).
+  zutsfm's (§7.9).
 
 ## 3. Position in the `zu*` family
 
@@ -470,16 +470,16 @@ consumer's first release, so they wait):
   samplers and evaluation, by the boundary rule of §7.8. It is written
   mostly in R against §5 and uses the C table (§8) for sampler loops and
   batch filling. zulm's modules stay generic.
-- **`zukzeit`** (RFC 0002) is the second consumer: an inference engine
+- **`zutsfm`** (RFC 0002) is the second consumer: an inference engine
   for time-series foundation models that today ports each architecture
   to R `torch` and certifies it against pinned reference fixtures. On
   zulm it keeps everything but the tensor runtime: catalogue, Hub
   download, preprocessing, decode loops, quantile repair, forecast
-  objects and adapters (§7.9). The maintainer has decided that zukzeit
+  objects and adapters (§7.9). The maintainer has decided that zutsfm
   uses zulm only: its 0.1.0 drops `torch`, so every certified checkpoint
   must run on zulm 0.1.0 (D33). This design proves the path on
-  zukzeit's smallest checkpoint before 0.1.0 ships (§15); the TimesFM
-  2.5 and Chronos-2 ports are zukzeit's work on zulm's released API.
+  zutsfm's smallest checkpoint before 0.1.0 ships (§15); the TimesFM
+  2.5 and Chronos-2 ports are zutsfm's work on zulm's released API.
 - **`zujson`** (0.1.0 on CRAN) parses the safetensors header (§7.4):
   an `Imports` entry with an R API, not a C table.
 - **`zuexact`** (RFC 0023), **`zufft`** (RFC 0026) and **`zuspecial`**
@@ -528,7 +528,7 @@ consumer's first release, so they wait):
   a prebuilt llama.cpp library from GitHub releases at run time. Neither
   offers training.
 - **`torch`** binds LibTorch (a large download at first use, which
-  `zukzeit` inherits for every user who wants to run a 16 MB
+  `zutsfm` inherits for every user who wants to run a 16 MB
   checkpoint); **`keras3`** and **`tensorflow`** go through Python.
 
 **The incumbent is torch, not ggmlR.** CRAN downloads in the 30 days to
@@ -541,7 +541,7 @@ bit for bit at a fixed seed, with a C table other packages can build
 on. For inference the case is the same and the user is a package: a
 pretrained transformer on zulm installs with its package from a CRAN
 binary, needs no runtime download, and gives the same bits on every
-machine of one ISA variant, where zukzeit's fixtures today drift by
+machine of one ISA variant, where zutsfm's fixtures today drift by
 ulps between hosts (§1.2). What torch keeps is the GPU and the
 ecosystem; a user who needs either should use it, and this design does
 not try to follow. The case against ggmlR below is about the shared
@@ -878,7 +878,7 @@ fill, so one `c(n_kv, n_q, 1, B)` mask serves all heads.
   and copy the requested outputs back. Inputs may be rewritten between
   computations any number of times without rebuilding the graph, from R
   or through the C table; every sampler loop in RFC 0032 and every
-  decode loop in zukzeit relies on this, and it is a tested contract,
+  decode loop in zutsfm relies on this, and it is a tested contract,
   not an implementation detail.
 - Before any ggml backward construction, zulm walks the forward graph
   and refuses, with `zulm_unsupported_backward` naming the operation
@@ -1167,7 +1167,7 @@ leaves the training path untouched.
   the dot product in the weight's type and convert the f32 activations
   to it first (`vec_dot_type` of `F16` is `F16`, of `BF16` is `BF16`),
   so products differ from an f32 run by about 1e-3 relative for f16 and
-  more for bf16, far beyond the ulp-level budget that zukzeit's parity
+  more for bf16, far beyond the ulp-level budget that zutsfm's parity
   fixtures allow. f32 is therefore the default and the only type the
   parity acceptance (§15) uses; f16 halves a 925 MB checkpoint for
   users who accept the difference, which the documentation quantifies,
@@ -1472,7 +1472,7 @@ the byte buffer. Duplicate keys are disallowed.
   eight-byte length and the header bytes in C, hands the header to R,
   parses it with `zujson` (0.1.0 on CRAN, the family's JSON package,
   which vendors yyjson itself; `Imports`, since a substrate that
-  zukzeit builds on cannot treat loading weights as optional), validates
+  zutsfm builds on cannot treat loading weights as optional), validates
   the list in R, and then reads the byte buffer in C straight into the
   store's tensors, one read per tensor in file order, with no R copy of
   the data. Writing goes the same way: `zujson` serialises the header,
@@ -1481,7 +1481,7 @@ the byte buffer. Duplicate keys are disallowed.
   family JSON package; `zujson` is that package, published since, so
   nothing is vendored (D36). The CRAN `safetensors` package (0.3.0,
   mlverse) loads only into `torch` or `pjrt` tensors through its
-  `framework` argument and cannot fill a zulm store, so zukzeit's
+  `framework` argument and cannot fill a zulm store, so zutsfm's
   current reader does not carry over.
 - **Checks.** `N` within the file and below a cap, offsets in range,
   ordered, non-overlapping and covering the buffer, known dtypes, and
@@ -1498,7 +1498,7 @@ the byte buffer. Duplicate keys are disallowed.
 - **API.** `zl_safetensors_read(path, names = NULL)` returns arrays;
   `zl_load_safetensors(p, path, map = NULL)` fills a store by a name
   map; `zl_save_safetensors(p, path, type, metadata)` writes one.
-- **Purpose.** Loading Hub checkpoints for zukzeit without a conversion
+- **Purpose.** Loading Hub checkpoints for zutsfm without a conversion
   step (§1.2; a `map` from checkpoint names to store names is the
   port's), export of zulm models, and import of PyTorch weights for
   users. Cross-framework validation (§11) does not wait for it:
@@ -1616,32 +1616,32 @@ What zuflow needs from zulm in C is in §8: run a graph, fill inputs
 from Philox and from an Arrow batch, read outputs, and read and write
 parameters (for weight averages). Everything else it does in R.
 
-### 7.9 What belongs to zukzeit (RFC 0002)
+### 7.9 What belongs to zutsfm (RFC 0002)
 
 The same rule, applied to inference: **zulm holds the tensor runtime
 (graphs, operations, weight types, state tensors, file formats);
-zukzeit holds the model layer.** To zukzeit, therefore: the checkpoint
+zutsfm holds the model layer.** To zutsfm, therefore: the checkpoint
 catalogue and Hub manifests, download and cache, each architecture's
 configuration and weight map, preprocessing and its inverse (reversible
 normalisation, Welford scaling, `asinh`), patching and masking, the
 decode loop and when it stops, quantile-channel selection and crossing
 repair, the forecast object and the fabletools and parsnip adapters,
 the execution contract and conformance harness, and the parity
-fixtures, which stay in zukzeit's repository and are run there.
+fixtures, which stay in zutsfm's repository and are run there.
 
 zulm's modules stay generic: `zl_attention()` does not learn TimesFM's
 per-dimension scale, Toto's unit scaling or Chronos-2's group mask. An
 architecture port composes §5.3 operations inside its own `build()` and
-loads its weights by name, as zukzeit's `torch` modules do today with
-`nnf_*` functions; §1.2 shows the block. What zukzeit needs from zulm
+loads its weights by name, as zutsfm's `torch` modules do today with
+`nnf_*` functions; §1.2 shows the block. What zutsfm needs from zulm
 in C is nothing for its first port and, if it moves a decode loop out
 of R, the state-tensor members of §8.
 
-zukzeit uses zulm only (D33): `torch` leaves its `Imports`, and with it
+zutsfm uses zulm only (D33): `torch` leaves its `Imports`, and with it
 the CUDA and MPS devices its contract exposes through `device`. Until
-zulm has a GPU backend (§17, question 5) zukzeit's `device` resolves to
+zulm has a GPU backend (§17, question 5) zutsfm's `device` resolves to
 the CPU alone, which is the only device its parity fixtures certified
-anyway. The order of the ports is zukzeit's roadmap decision; the
+anyway. The order of the ports is zutsfm's roadmap decision; the
 sizes suggest Toto 2.0 4M (16 MB, one pass), then Chronos-2 (one pass,
 478 MB), then TimesFM 2.5 (925 MB, decode over state tensors).
 
@@ -1747,7 +1747,7 @@ static inline const zulm_api *zulm_api_get(void);
   for sliding windows and a future key-value cache
   (`input_write_f32_at`, `state_write_f32_at`), for training
   from Arrow (`batch_fill`) and for weight averages
-  (`param_read_f32`, `param_write_f32`); and what zukzeit (§7.9) would
+  (`param_read_f32`, `param_write_f32`); and what zutsfm (§7.9) would
   need for a decode loop in C (`compute`, the state members). zulm
   needs no hooks into consumers: companions are reached through their
   tables, not registered into zulm.
@@ -2012,9 +2012,9 @@ from `zl_step()`).
   form; f16 and bf16 weights against f32 within the tolerance §6.9
   documents, and a test that fails if the difference shrinks below it,
   so the documentation stays true; `zl_graph_cache()` builds once per
-  shape and evicts under the memory cap; zukzeit's Toto 2.0 4M parity
-  fixtures pass in a zukzeit branch whose runtime is zulm, run in
-  zukzeit's CI against zulm's `main` (the fixtures are zukzeit's and
+  shape and evicts under the memory cap; zutsfm's Toto 2.0 4M parity
+  fixtures pass in a zutsfm branch whose runtime is zulm, run in
+  zutsfm's CI against zulm's `main` (the fixtures are zutsfm's and
   stay there), with the zulm side recorded in `cran-comments.md` as a
   reverse-dependency check.
 - **Companions, both paths.** The suite runs with and without
@@ -2139,7 +2139,7 @@ weights, on the same AVX2 machine, one thread unless stated:
 
 - One TimesFM 2.5 transformer block over 512 patches plus the
   continuous head on the last patch (37.7 M parameters; the shape
-  zukzeit timed on LibTorch 2.8 at 0.133 s on an x86-64 Mac): within
+  zutsfm timed on LibTorch 2.8 at 0.133 s on an x86-64 Mac): within
   2× of R `torch` on the same host at the same thread count, and
   within 1.3× at four threads. The figure is a floor to beat, not a
   claim: LibTorch's products run on MKL or OpenBLAS, and the drafting
@@ -2591,16 +2591,16 @@ the vendoring go/no-go is Stage 1.
 | 9 | State tensors, `set_rows`, the graph cache; the decode-loop test; `input_write_f32_at` | M |
 | 10 | Flash attention forward-only: mask format, agreement with the plain form, thread-count measurement | S |
 | 11 | Arrow iterator and `batch_fill`, with nanoarrow, DuckDB and Parquet fixtures | M |
-| 12 | The C table, `zulm.h`, a fixture consumer; zukzeit's Toto 2.0 4M on zulm in a zukzeit branch, parity green | M |
+| 12 | The C table, `zulm.h`, a fixture consumer; zutsfm's Toto 2.0 4M on zulm in a zutsfm branch, parity green | M |
 | 13 | Fuzzing, benchmarks (training and inference), documentation | M |
 | 14 | v0.1.0 readiness | S |
 
 Stages 1 to 7 are the training substrate, 8 to 11 the inference and
 data pieces the two consumers need, and 12 the proof that both can
 build on the result: a fixture consumer for zuflow's pattern of use,
-and zukzeit's smallest certified checkpoint running on zulm from a
-branch of zukzeit, which is where the fixtures live. TimesFM 2.5 and
-Chronos-2 are ported in zukzeit after zulm's release, on zukzeit's
+and zutsfm's smallest certified checkpoint running on zulm from a
+branch of zutsfm, which is where the fixtures live. TimesFM 2.5 and
+Chronos-2 are ported in zutsfm after zulm's release, on zutsfm's
 roadmap; zulm's own gate for them is the TimesFM-style decode test of
 Stage 9 and the §1.2 block fixtures of Stage 6.
 
@@ -2641,12 +2641,12 @@ Stages 5 and 9" reads zulm's Stages 6 and 12.
    within tolerance, so both rotary conventions, partial rotation,
    broadcast masks and the unit-scaled forms are pinned before any
    checkpoint is ported.
-10. zukzeit's committed parity fixtures for Toto 2.0 4M pass with the
-    port's tensor runtime replaced by zulm, within zukzeit's documented
-    tolerance, on CPU, on every CI leg, from a branch of zukzeit that
+10. zutsfm's committed parity fixtures for Toto 2.0 4M pass with the
+    port's tensor runtime replaced by zulm, within zutsfm's documented
+    tolerance, on CPU, on every CI leg, from a branch of zutsfm that
     its maintainer can merge after zulm's release.
     The branch is
-    [`zulm-runtime`](https://github.com/pedrobtz/zukzeit/tree/zulm-runtime),
+    [`zulm-runtime`](https://github.com/pedrobtz/zutsfm/tree/zulm-runtime),
     whose `parity-zulm` job installs zulm's `main`.
 11. A TimesFM-style decode of 256 values through state tensors equals
     the full-context forward pass within f32 tolerance; weights
@@ -2674,7 +2674,7 @@ job that holds it:
 | 7 | `test-c-table.R` (the `zulmclient` fixture package) | met |
 | 8 | `vendor` workflow and `tools/verify-ggml` (no pragma); `build-flags` (only `R_init_` exported, three platforms) | met |
 | 9 | `test-ops.R` (R oracles), `test-fixtures.R` (both §1.2 blocks from GGUF) | met |
-| 10 | zukzeit's `zulm-runtime` branch, `parity-zulm` job, against zulm's `main` | met |
+| 10 | zutsfm's `zulm-runtime` branch, `parity-zulm` job, against zulm's `main` | met |
 | 11 | `test-decode.R`, `test-safetensors.R`, `test-fixtures.R` (f16 band); `measure` (§12 inference targets, misses recorded) | met |
 | 12 | `tools/acceptance/arrow-duckdb.R` in the `acceptance` workflow | met |
 
@@ -2708,13 +2708,13 @@ job that holds it:
 | D24 | BLIS, Highway | rejected for v0.1.0 (§7.7) |
 | D25 | zuflow boundary | primitives here; algorithms in RFC 0032 |
 | D26 | Gradient clipping | patch P7 inside `ggml-opt`; no zulm-owned optimiser graph |
-| D27 | Releases | decided by the maintainer 2026-10-14: v0.1.0 carries everything zuflow 0.1.0 and zukzeit 0.1.0 need (training, inference, safetensors, state tensors, Arrow), proved on Toto 2.0 4M; 0.2: `zuexact`, the FFT and sorting, which neither needs |
+| D27 | Releases | decided by the maintainer 2026-10-14: v0.1.0 carries everything zuflow 0.1.0 and zutsfm 0.1.0 need (training, inference, safetensors, state tensors, Arrow), proved on Toto 2.0 4M; 0.2: `zuexact`, the FFT and sorting, which neither needs |
 | D28 | clang | part of the §13.1 go/no-go, because CRAN ships x86-64 macOS binaries |
 | D29 | Upstream pragmas | stripped by the vendor script, not patched (§9.2) |
 | D30 | Inputs | in a static buffer of the graph's own; named outputs flagged (§4); rewritable between runs (§6.2) |
 | D31 | Name | `zulm`, by the repository's creation; RFC 0031's `zuggml` is history |
 | D32 | R prefix | `zl_`, decided by the maintainer 2026-10-14; the family's "name minus zu" rule gives `lm_`, which collides with `stats::lm()` and the `lm_*` functions on CRAN |
-| D33 | Second consumer | zukzeit's inference (§1.2, §7.9); decided by the maintainer 2026-10-14 that zukzeit uses zulm only, dropping `torch`; zulm proves the path on Toto 2.0 4M before 0.1.0 |
+| D33 | Second consumer | zutsfm's inference (§1.2, §7.9); decided by the maintainer 2026-10-14 that zutsfm uses zulm only, dropping `torch`; zulm proves the path on Toto 2.0 4M before 0.1.0 |
 | D34 | Key-value cache | fixed-capacity state tensors written with `set_rows` under a mask; one graph per `n_new` (§6.9) |
 | D35 | Weight types in memory | f32 by default and for parity; f16, bf16 opt-in with the precision cost quantified (§6.9) |
 | D36 | safetensors header | parsed by `zujson` from R; yyjson not vendored (§7.4) |
@@ -2730,13 +2730,13 @@ job that holds it:
    rule gives `lm_`, rejected for `stats::lm()`; `gg_` is taken by other
    packages (naniar's `gg_miss_*`, for one) and names the library rather
    than the package; `ulm_` is free but reads as nothing. `zl_` pairs
-   with zuflow's `zf_` and zukzeit's `zuk_`.
-2. **zukzeit's runtime.** **Decided 2026-10-14: zukzeit uses zulm
-   only (D33).** `torch` leaves zukzeit; CUDA and MPS go with it until
+   with zuflow's `zf_` and zutsfm's `zuk_`.
+2. **zutsfm's runtime.** **Decided 2026-10-14: zutsfm uses zulm
+   only (D33).** `torch` leaves zutsfm; CUDA and MPS go with it until
    zulm has a GPU backend (question 5). The consequence for zulm is
    that v0.1.0 must suffice for all three certified checkpoints, which
    is what D27 and the §1.2 inventory provide; the consequence for
-   zukzeit is that its 0.1.0 waits for its three ports to pass parity
+   zutsfm is that its 0.1.0 waits for its three ports to pass parity
    on zulm, Toto first.
 3. **C table or ggml headers through `LinkingTo`?** Recommended: the
    table (§8). Revisit only if a consumer must add ggml operations from
@@ -2799,7 +2799,7 @@ job that holds it:
     ggml's operation list.
 13. **`zujson`: `Suggests` or `Imports`?** **Decided with D27:
     `Imports`.** Loading weights is not an optional feature of a
-    substrate that zukzeit 0.1.0 builds on, and zujson is one small
+    substrate that zutsfm 0.1.0 builds on, and zujson is one small
     CRAN package with no compiled dependency of its own. RFC 0031's
     alternative, vendoring yyjson, is withdrawn (D36).
 14. **Arrow without nanoarrow.** Accept only
@@ -2817,9 +2817,9 @@ job that holds it:
     512 or more keys, and zulm computes a single query twice to avoid
     that path, so `zl_flash_attention()` is thread-invariant and ships
     enabled (§6.5, §6.9). The plain form stays the reference for
-    zukzeit's parity runs, since the two differ in the last bits.
+    zutsfm's parity runs, since the two differ in the last bits.
 17. **The graph cache: R or C?** §6.9 keeps it an R environment.
-    zuflow's samplers vary no shapes from C, and zukzeit's decode loops
+    zuflow's samplers vary no shapes from C, and zutsfm's decode loops
     are in R, so no consumer needs it from the table. Recommended: R
     only until a consumer asks; a table member that builds graphs would
     have to carry the `build()` closure, which is an R object.
@@ -2827,15 +2827,15 @@ job that holds it:
     f16 and bf16 weights in a store whose consumer declares a parity
     budget, or only document the cost? Recommended: document and
     report (`zulm_info()`); the consumer that runs fixtures knows which
-    types it loaded. If zukzeit wants a guard, it is one line in its
+    types it loaded. If zutsfm wants a guard, it is one line in its
     loader.
 
 ## 18. What this design does not decide
 
 - zuflow's model, data pipeline, samplers and evaluation: its own RFC.
-- The order and timing of zukzeit's three ports to zulm; this design
-  proves the path on one checkpoint (§15) and zukzeit's roadmap records
-  the rest. That zukzeit uses zulm only is decided (D33).
+- The order and timing of zutsfm's three ports to zulm; this design
+  proves the path on one checkpoint (§15) and zutsfm's roadmap records
+  the rest. That zutsfm uses zulm only is decided (D33).
 - Whether ggmlR's users should move; the packages serve different
   purposes and both remain.
 - GPU backends, mixed-precision training and quantised inference beyond
