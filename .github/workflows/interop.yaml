@@ -1,9 +1,8 @@
 # GGUF files written by zulm are read by upstream's gguf Python package,
 # and files it writes are read by zl_load() (design §11, Stage 2).
 on:
-  push:
-    branches: [main, master]
-    paths-ignore: ['**.md', '.agents/**', '_pkgdown.yml', 'docs/**']
+  # No `push:`: a pull request already checks its merge with main,
+  # and the schedule checks main (r-actions README, "Pushes to main").
   pull_request:
     paths-ignore: ['**.md', '.agents/**', '_pkgdown.yml', 'docs/**']
 
