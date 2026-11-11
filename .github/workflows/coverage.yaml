@@ -2,8 +2,10 @@
 # on pull requests: after each merge to main, where it also updates the
 # badge, and when dispatched, as in the full run before submission.
 on:
-  push:
-    branches: [main, master]
+  # No `push:`: a pull request already checks its merge with main,
+  # and the schedule checks main (r-actions README, "Pushes to main").
+  schedule:
+    - cron: "0 10 * * 0"
   workflow_dispatch:
 
 name: coverage

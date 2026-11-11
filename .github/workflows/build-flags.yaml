@@ -4,9 +4,8 @@
 # variant shared objects), and any exported symbol besides R_init_. CRAN's
 # pretest rejects the first three; the last is the hidden-symbols rule R3.
 on:
-  push:
-    branches: [main, master]
-    paths-ignore: ['**.md', '.agents/**', '_pkgdown.yml', 'docs/**']
+  # No `push:`: a pull request already checks its merge with main,
+  # and the schedule checks main (r-actions README, "Pushes to main").
   pull_request:
     paths-ignore: ['**.md', '.agents/**', '_pkgdown.yml', 'docs/**']
 
