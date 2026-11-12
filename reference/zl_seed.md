@@ -7,8 +7,10 @@ and
 [`zl_rng_normal()`](https://pedrobtz.github.io/zulm/reference/zl_rng_uniform.md))
 comes from 'zurand' under a key derived from the session key and a name.
 `zl_seed()` sets the session key from a whole number, or from a key made
-with [`zurand::rng_key()`](https://rdrr.io/pkg/zurand/man/rng_key.html)
-or [`zurand::rng_fold()`](https://rdrr.io/pkg/zurand/man/rng_fold.html);
+with
+[`zurand::rng_key()`](https://pedrobtz.github.io/zurand/reference/rng_key.html)
+or
+[`zurand::rng_fold()`](https://pedrobtz.github.io/zurand/reference/rng_fold.html);
 with no argument it returns the current key. Until it is set, the key is
 drawn once from R's generator, so
 [`set.seed()`](https://rdrr.io/r/base/Random.html) before the first draw
